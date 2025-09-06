@@ -11,6 +11,8 @@ const CameraScreen = () => {
   const canvasRef = useRef(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [detectedObject, setDetectedObject] = useState(null);
+  const [detectedObjects, setDetectedObjects] = useState([]);
+  const [showObjectSelector, setShowObjectSelector] = useState(false);
   const [stream, setStream] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
 
@@ -73,17 +75,27 @@ const CameraScreen = () => {
         const imageUrl = URL.createObjectURL(blob);
         
         // Detect objects in the image
-        const detection = await ObjectDetectionService.detectObjects(imageUrl);
-        setDetectedObject(detection);
+        const detections = await ObjectDetectionService.detectObjects(imageUrl);
         
-        const confirmed = window.confirm(
-          `Jag hittade en ${detection.objectClass} (${Math.round(detection.confidence * 100)}% säker). Vill du dela spelet?`
-        );
-        
-        if (confirmed) {
-          await shareGame(detection);
+        if (Array.isArray(detections)) {
+          // Multiple objects detected
+          setDetectedObjects(detections);
+          setShowObjectSelector(true);
         } else {
-          setDetectedObject(null);
+          // Single object detected
+          setDetectedObject(detections);
+          setDetectedObjects([detections]);
+          
+          const confirmed = window.confirm(
+            `Jag hittade en ${detections.objectClass} (${Math.round(detections.confidence * 100)}% säker). Vill du dela spelet?`
+          );
+          
+          if (confirmed) {
+            await shareGame(detections);
+          } else {
+            setDetectedObject(null);
+            setDetectedObjects([]);
+          }
         }
         
         // Clean up
@@ -116,6 +128,28 @@ const CameraScreen = () => {
       console.error('Error sharing game:', error);
       alert('Kunde inte dela spelet');
     }
+  };
+
+  const handleObjectSelect = async (selectedObject) => {
+    setDetectedObject(selectedObject);
+    setShowObjectSelector(false);
+    
+    const confirmed = window.confirm(
+      `Du valde: ${selectedObject.objectClass} (${Math.round(selectedObject.confidence * 100)}% säker). Vill du dela spelet?`
+    );
+    
+    if (confirmed) {
+      await shareGame(selectedObject);
+    } else {
+      setDetectedObject(null);
+      setDetectedObjects([]);
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setShowObjectSelector(false);
+    setDetectedObjects([]);
+    setDetectedObject(null);
   };
 
   if (isModelLoading) {
@@ -166,7 +200,40 @@ const CameraScreen = () => {
         </div>
       </div>
 
-      {detectedObject && (
+      {showObjectSelector && (
+        <div className="object-selector-overlay">
+          <div className="object-selector">
+            <h3>Välj objekt att skicka:</h3>
+            <div className="object-list">
+              {detectedObjects.map((obj, index) => (
+                <div 
+                  key={index} 
+                  className="object-option"
+                  onClick={() => handleObjectSelect(obj)}
+                >
+                  <div className="object-info">
+                    <span className="object-name">{obj.objectClass}</span>
+                    <span className="object-confidence">
+                      {Math.round(obj.confidence * 100)}% säker
+                    </span>
+                  </div>
+                  <div className="object-arrow">→</div>
+                </div>
+              ))}
+            </div>
+            <div className="object-selector-actions">
+              <button 
+                className="btn btn-secondary" 
+                onClick={handleCancelSelection}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {detectedObject && !showObjectSelector && (
         <div className="game-info">
           <p><strong>Objekt:</strong> {detectedObject.objectClass}</p>
           <p><strong>Säkerhet:</strong> {Math.round(detectedObject.confidence * 100)}%</p>

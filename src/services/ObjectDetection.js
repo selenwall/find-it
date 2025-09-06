@@ -45,17 +45,24 @@ class ObjectDetectionService {
                 const validPredictions = predictions.filter(p => p.score > 0.3);
                 
                 if (validPredictions.length > 0) {
-                  // Return the object with highest confidence
-                  const bestDetection = validPredictions.reduce((best, current) => 
-                    current.score > best.score ? current : best
-                  );
+                  // Sort by confidence and return all valid predictions
+                  const sortedPredictions = validPredictions
+                    .sort((a, b) => b.score - a.score)
+                    .map(prediction => ({
+                      objectClass: prediction.class,
+                      confidence: prediction.score,
+                      bbox: prediction.bbox
+                    }));
 
-                  console.log('Best detection:', bestDetection);
-                  resolve({
-                    objectClass: bestDetection.class,
-                    confidence: bestDetection.score,
-                    bbox: bestDetection.bbox
-                  });
+                  console.log('All detections:', sortedPredictions);
+                  
+                  // If only one object, return it directly
+                  if (sortedPredictions.length === 1) {
+                    resolve(sortedPredictions[0]);
+                  } else {
+                    // Multiple objects - return array
+                    resolve(sortedPredictions);
+                  }
                 } else {
                   console.log('No high-confidence predictions found');
                   resolve(this.getFallbackDetection());
@@ -118,7 +125,7 @@ class ObjectDetectionService {
       }
     ];
 
-    // Return a random object for demo
+    // Return a random object for demo (single object)
     const randomDetection = mockDetections[Math.floor(Math.random() * mockDetections.length)];
 
     return {
