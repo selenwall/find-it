@@ -2,7 +2,7 @@
   "name": "hitta-game",
   "version": "1.0.0",
   "description": "Hitta! - Ett webbspel där spelare tar foton och delar objekt",
-  "homepage": "https://yourusername.github.io/hitta-game",
+  "homepage": "https://selenwall.github.io/find-it",
   "main": "src/index.js",
   "scripts": {
     "start": "react-scripts start",
