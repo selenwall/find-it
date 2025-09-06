@@ -10,21 +10,13 @@ const HomeScreen = () => {
   const [hasGameLink, setHasGameLink] = useState(false);
 
   useEffect(() => {
-    // Check for incoming game data from URL parameters
+    // Check for incoming game data from URL (supports hash routing)
     const checkForIncomingGame = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const gameData = urlParams.get('game');
-      if (gameData) {
+      const fullUrl = window.location.href;
+      const parsed = SMSService.parseGameData(fullUrl);
+      if (parsed) {
         setHasGameLink(true);
-        try {
-          const parsedData = JSON.parse(decodeURIComponent(gameData));
-          if (parsedData.type === 'HITTA_GAME') {
-            // Don't auto-start game, just show join option
-            console.log('Game link detected:', parsedData);
-          }
-        } catch (error) {
-          console.error('Error parsing game data:', error);
-        }
+        console.log('Game link detected:', parsed);
       } else {
         setHasGameLink(false);
       }
@@ -56,26 +48,15 @@ const HomeScreen = () => {
       alert('Ange ditt namn först');
       return;
     }
-    // Check for incoming game data from URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const gameData = urlParams.get('game');
-    if (gameData) {
-      try {
-        const parsedData = JSON.parse(decodeURIComponent(gameData));
-        if (parsedData.type === 'HITTA_GAME') {
-          // Set player2 name when joining (use current player's name)
-          dispatch({ type: 'SET_PLAYER2', payload: currentPlayer });
-          dispatch({
-            type: 'START_GAME',
-            payload: { ...parsedData, isJoining: true },
-          });
-          // Navigate directly to game to start finding the object
-          navigate('/game');
-        }
-      } catch (error) {
-        console.error('Error parsing game data:', error);
-        alert('Kunde inte läsa speldata från länken');
-      }
+    // Use shared parser to handle both hash and search query formats
+    const parsedData = SMSService.parseGameData(window.location.href);
+    if (parsedData && parsedData.type === 'HITTA_GAME') {
+      dispatch({ type: 'SET_PLAYER2', payload: currentPlayer });
+      dispatch({
+        type: 'START_GAME',
+        payload: { ...parsedData, isJoining: true },
+      });
+      navigate('/game');
     } else {
       alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
     }
