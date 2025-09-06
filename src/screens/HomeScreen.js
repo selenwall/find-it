@@ -68,17 +68,13 @@ const HomeScreen = () => {
       try {
         const parsedData = JSON.parse(decodeURIComponent(gameData));
         if (parsedData.type === 'HITTA_GAME') {
-          console.log('HomeScreen: Parsed game data:', parsedData);
           // Set player2 name when joining
           dispatch({ type: 'SET_PLAYER2', payload: friendName });
-          const gamePayload = { ...parsedData, isJoining: true };
-          console.log('HomeScreen: Starting game with payload:', gamePayload);
           dispatch({
             type: 'START_GAME',
-            payload: gamePayload,
+            payload: { ...parsedData, isJoining: true },
           });
           // Navigate directly to game to start finding the object
-          console.log('HomeScreen: Navigating to /game');
           navigate('/game');
         }
       } catch (error) {

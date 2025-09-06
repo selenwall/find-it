@@ -66,7 +66,7 @@ const gameReducer = (state, action) => {
         targetObject: action.payload.targetObject,
         foundObject: null,
         gameState: 'playing',
-        isMyTurn: true,
+        isMyTurn: !action.payload.isJoining, // Player1's turn when creating, Player2's turn when joining
         waitingForOpponent: false,
         // Set player info based on whether it's a new game or joining
         player1: action.payload.isJoining ? state.player1 : { name: action.payload.playerName, score: state.player1.score },
