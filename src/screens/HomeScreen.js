@@ -7,7 +7,6 @@ const HomeScreen = () => {
   const { currentPlayer, score, player1, player2, dispatch } = useGame();
   const navigate = useNavigate();
   const [playerName, setPlayerName] = useState(currentPlayer || '');
-  const [friendName, setFriendName] = useState('');
   const [hasGameLink, setHasGameLink] = useState(false);
 
   useEffect(() => {
@@ -57,10 +56,6 @@ const HomeScreen = () => {
       alert('Ange ditt namn först');
       return;
     }
-    if (!friendName.trim()) {
-      alert('Ange motspelarens namn');
-      return;
-    }
     // Check for incoming game data from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const gameData = urlParams.get('game');
@@ -68,13 +63,14 @@ const HomeScreen = () => {
       try {
         const parsedData = JSON.parse(decodeURIComponent(gameData));
         if (parsedData.type === 'HITTA_GAME') {
-          // Set player2 name when joining
-          dispatch({ type: 'SET_PLAYER2', payload: friendName });
+          // Set player2 name when joining (use current player's name)
+          dispatch({ type: 'SET_PLAYER2', payload: currentPlayer });
           dispatch({
             type: 'START_GAME',
             payload: { ...parsedData, isJoining: true },
           });
           // Navigate directly to game to start finding the object
+          console.log('Navigating to /game with payload:', { ...parsedData, isJoining: true });
           navigate('/game');
         }
       } catch (error) {
@@ -140,17 +136,8 @@ const HomeScreen = () => {
       ) : (
         <div className="card">
           <h2>Gå med i spel</h2>
-          <p>Du har fått en spellänk! Ange ditt namn och motspelarens namn för att gå med.</p>
+          <p>Du har fått en spellänk! Ange ditt namn för att gå med i spelet.</p>
           
-          <div style={{ marginBottom: '15px' }}>
-            <input
-              className="input"
-              type="text"
-              placeholder="Ange motspelarens namn"
-              value={friendName}
-              onChange={(e) => setFriendName(e.target.value)}
-            />
-          </div>
           <button className="btn btn-primary btn-large" onClick={handleJoinGame}>
             🎮 Gå med i spel
           </button>
@@ -169,7 +156,7 @@ const HomeScreen = () => {
           </ol>
         ) : (
           <ol style={{ lineHeight: '1.6', color: '#666' }}>
-            <li>Ange ditt namn och motspelarens namn</li>
+            <li>Ange ditt namn</li>
             <li>Klicka "Gå med i spel"</li>
             <li>Du har 5 minuter att hitta objektet</li>
             <li>Ta foto när du hittat det rätta objektet</li>
