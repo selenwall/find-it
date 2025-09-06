@@ -113,7 +113,7 @@ const CameraScreen = () => {
     try {
       const success = await SMSService.shareGame(object, currentPlayer);
       if (success) {
-        // Start the game for the current player
+        // Set up the game and enter waiting state
         dispatch({
           type: 'START_GAME',
           payload: {
@@ -122,7 +122,12 @@ const CameraScreen = () => {
             timestamp: Date.now(),
           },
         });
-        navigate('/game');
+        
+        // Enter waiting state for opponent
+        dispatch({ type: 'SHARE_GAME' });
+        
+        // Navigate to waiting screen
+        navigate('/waiting');
       }
     } catch (error) {
       console.error('Error sharing game:', error);

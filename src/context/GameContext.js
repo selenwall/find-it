@@ -13,6 +13,11 @@ const initialState = {
   isGameActive: false,
   targetObject: null,
   foundObject: null,
+  // Turn-based game states
+  gameState: 'idle', // 'idle', 'waiting_for_opponent', 'playing', 'opponent_found'
+  isMyTurn: true,
+  opponentScore: 0,
+  waitingForOpponent: false,
 };
 
 const gameReducer = (state, action) => {
@@ -32,6 +37,24 @@ const gameReducer = (state, action) => {
         timeLeft: 300,
         targetObject: action.payload.targetObject,
         foundObject: null,
+        gameState: 'playing',
+        isMyTurn: true,
+        waitingForOpponent: false,
+      };
+    case 'SHARE_GAME':
+      return {
+        ...state,
+        gameState: 'waiting_for_opponent',
+        waitingForOpponent: true,
+        isMyTurn: false,
+      };
+    case 'OPPONENT_FOUND_OBJECT':
+      return {
+        ...state,
+        gameState: 'opponent_found',
+        waitingForOpponent: false,
+        isMyTurn: true,
+        opponentScore: state.opponentScore + 1,
       };
     case 'END_GAME':
       return {
@@ -40,6 +63,9 @@ const gameReducer = (state, action) => {
         currentGame: null,
         targetObject: null,
         foundObject: null,
+        gameState: 'idle',
+        waitingForOpponent: false,
+        isMyTurn: true,
       };
     case 'UPDATE_TIME':
       return { ...state, timeLeft: action.payload };
@@ -49,6 +75,9 @@ const gameReducer = (state, action) => {
         foundObject: action.payload,
         score: state.score + 1,
         isGameActive: false,
+        gameState: 'idle',
+        isMyTurn: true,
+        waitingForOpponent: false,
       };
     case 'UPDATE_SCORE':
       return { ...state, score: action.payload };

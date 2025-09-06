@@ -117,7 +117,6 @@ const GameScreen = () => {
 
   const endGame = (found) => {
     stopTimer();
-    dispatch({ type: 'END_GAME' });
     
     if (found) {
       dispatch({ type: 'FOUND_OBJECT', payload: targetObject });
@@ -129,11 +128,14 @@ const GameScreen = () => {
         shareScore();
       }
       
-      navigate('/home');
+      // After finding object, it's now your turn to find something new
+      dispatch({ type: 'END_GAME' });
+      navigate('/camera');
     } else {
       alert(
         `Tiden är ute! ⏰ Du hittade inte en ${targetObject.objectClass} i tid. Bättre lycka nästa gång!`
       );
+      dispatch({ type: 'END_GAME' });
       navigate('/home');
     }
   };
