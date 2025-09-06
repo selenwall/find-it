@@ -259,12 +259,15 @@ const GameScreen = () => {
     return (
       <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
         <h2>Inget aktivt spel</h2>
+        <p>isGameActive: {isGameActive ? 'true' : 'false'}</p>
         <button className="btn btn-primary" onClick={() => navigate('/')}>
           Tillbaka till start
         </button>
       </div>
     );
   }
+
+  console.log('GameScreen render: targetObject =', targetObject, 'isGameActive =', isGameActive);
 
   return (
     <div className="game-screen">
@@ -283,7 +286,7 @@ const GameScreen = () => {
             <div className="timer">
               {formatTime(localTimeLeft)}
             </div>
-            <p><strong>Hitta en: {targetObject.objectClass}</strong></p>
+            <p><strong>Hitta en: {targetObject?.objectClass || 'Objekt'}</strong></p>
             <div className="scores-display">
               <div className="score-item">
                 <span className="player-name">{player1.name || 'Spelare 1'}</span>
