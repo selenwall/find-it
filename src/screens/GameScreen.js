@@ -19,9 +19,23 @@ const GameScreen = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [stream, setStream] = useState(null);
+  const [isModelLoading, setIsModelLoading] = useState(true);
   const timerRef = useRef(null);
 
   useEffect(() => {
+    const initializeAI = async () => {
+      try {
+        await ObjectDetectionService.loadModel();
+        setIsModelLoading(false);
+        console.log('AI model ready for game');
+      } catch (error) {
+        console.error('Failed to load AI model:', error);
+        setIsModelLoading(false);
+      }
+    };
+    
+    initializeAI();
+    
     if (isGameActive && !gameStarted) {
       startGame();
       startCamera();
@@ -159,6 +173,16 @@ const GameScreen = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  if (isModelLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Laddar AI-modell...</p>
+        <p style={{ fontSize: '14px', opacity: 0.7 }}>Förbereder objektigenkänning...</p>
+      </div>
+    );
+  }
 
   if (!isGameActive) {
     return (

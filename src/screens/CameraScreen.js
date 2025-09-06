@@ -12,10 +12,22 @@ const CameraScreen = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [detectedObject, setDetectedObject] = useState(null);
   const [stream, setStream] = useState(null);
+  const [isModelLoading, setIsModelLoading] = useState(true);
 
   useEffect(() => {
     // Initialize object detection service
-    ObjectDetectionService.loadModel();
+    const initializeAI = async () => {
+      try {
+        await ObjectDetectionService.loadModel();
+        setIsModelLoading(false);
+        console.log('AI model ready');
+      } catch (error) {
+        console.error('Failed to load AI model:', error);
+        setIsModelLoading(false);
+      }
+    };
+    
+    initializeAI();
     startCamera();
     
     return () => {
@@ -106,11 +118,21 @@ const CameraScreen = () => {
     }
   };
 
+  if (isModelLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Laddar AI-modell...</p>
+        <p style={{ fontSize: '14px', opacity: 0.7 }}>Detta kan ta några sekunder första gången</p>
+      </div>
+    );
+  }
+
   if (isProcessing) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Analyserar foto...</p>
+        <p>Analyserar foto med AI...</p>
       </div>
     );
   }
