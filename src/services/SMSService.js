@@ -4,10 +4,7 @@ class SMSService {
   async shareGame(targetObject, playerName) {
     try {
       const gameData = {
-        type: 'HITTA_GAME',
-        targetObject: targetObject,
-        playerName: playerName,
-        timestamp: Date.now(),
+        obj: targetObject.objectClass
       };
 
       const encodedData = encodeURIComponent(JSON.stringify(gameData));
@@ -65,8 +62,17 @@ class SMSService {
       const gameParam = urlObj.searchParams.get('game');
       if (gameParam) {
         const gameData = JSON.parse(decodeURIComponent(gameParam));
-        if (gameData.type === 'HITTA_GAME') {
-          return gameData;
+        if (gameData.obj) {
+          // Convert back to the expected format
+          return {
+            type: 'HITTA_GAME',
+            targetObject: {
+              objectClass: gameData.obj,
+              confidence: 0.9 // Default confidence
+            },
+            playerName: 'Unknown',
+            timestamp: Date.now()
+          };
         }
       }
       return null;
