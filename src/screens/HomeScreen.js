@@ -74,6 +74,7 @@ const HomeScreen = () => {
             type: 'START_GAME',
             payload: { ...parsedData, isJoining: true },
           });
+          // Navigate directly to game to start finding the object
           navigate('/game');
         }
       } catch (error) {

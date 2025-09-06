@@ -61,7 +61,9 @@ const GameScreen = () => {
 
   // Start camera when component mounts and game is active
   useEffect(() => {
+    console.log('GameScreen: isGameActive =', isGameActive, 'isModelLoading =', isModelLoading);
     if (isGameActive && !isModelLoading) {
+      console.log('GameScreen: Starting camera...');
       startCamera();
     }
   }, [isGameActive, isModelLoading]);
@@ -104,12 +106,15 @@ const GameScreen = () => {
 
   const startCamera = async () => {
     try {
+      console.log('GameScreen: Requesting camera access...');
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' }
       });
+      console.log('GameScreen: Camera access granted');
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        console.log('GameScreen: Video element updated with stream');
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
