@@ -230,6 +230,18 @@
   text-align: center;
 }
 
+.camera-status {
+  color: #4CAF50 !important;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
 /* Additional styles for game screens */
 .camera-screen, .game-screen, .score-screen {
   min-height: 100vh;

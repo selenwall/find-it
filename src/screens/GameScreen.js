@@ -57,6 +57,24 @@ const GameScreen = () => {
     }
   }, [localTimeLeft]);
 
+  // Start camera when component mounts and game is active
+  useEffect(() => {
+    if (isGameActive && !isModelLoading) {
+      startCamera();
+    }
+  }, [isGameActive, isModelLoading]);
+
+  // Also start camera when component mounts (for navigation from other screens)
+  useEffect(() => {
+    if (!isModelLoading && isGameActive) {
+      // Small delay to ensure video element is ready
+      const timer = setTimeout(() => {
+        startCamera();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   const startGame = () => {
     setGameStarted(true);
     setLocalTimeLeft(300); // Reset timer to 5 minutes
@@ -310,6 +328,9 @@ const GameScreen = () => {
 
       <div className="game-info">
         <p>{isProcessing ? 'Analyserar foto...' : 'Ta foto när du hittat objektet!'}</p>
+        {stream && (
+          <p className="camera-status">📹 Kameran är igång - leta efter objektet!</p>
+        )}
       </div>
     </div>
   );
