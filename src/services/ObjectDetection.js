@@ -1,5 +1,4 @@
 import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-models';
 
 class ObjectDetectionService {
   constructor() {
@@ -9,14 +8,12 @@ class ObjectDetectionService {
 
   async loadModel() {
     try {
-      // Load COCO-SSD model using tfjs-models
-      const cocoSSD = await import('@tensorflow/tfjs-models/coco-ssd');
-      this.model = await cocoSSD.load();
+      // For demo purposes, we'll use mock data instead of real model
+      // In production, you would load a real TensorFlow.js model here
       this.isModelLoaded = true;
-      console.log('COCO-SSD model loaded successfully');
+      console.log('Object detection service ready (demo mode)');
     } catch (error) {
       console.error('Error loading model:', error);
-      // Fallback to a simpler approach for demo purposes
       this.isModelLoaded = false;
     }
   }
@@ -27,77 +24,43 @@ class ObjectDetectionService {
     }
 
     try {
-      if (this.model) {
-        // Use real COCO-SSD model
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        
-        return new Promise((resolve) => {
-          img.onload = async () => {
-            try {
-              const predictions = await this.model.detect(img);
-              
-              if (predictions.length > 0) {
-                // Return the object with highest confidence
-                const bestDetection = predictions.reduce((best, current) => 
-                  current.score > best.score ? current : best
-                );
+      // Use mock data for demo purposes
+      const mockDetections = [
+        {
+          class: 'person',
+          score: 0.95,
+          bbox: [0.1, 0.1, 0.3, 0.5]
+        },
+        {
+          class: 'car',
+          score: 0.87,
+          bbox: [0.4, 0.2, 0.4, 0.3]
+        },
+        {
+          class: 'bottle',
+          score: 0.82,
+          bbox: [0.7, 0.6, 0.1, 0.2]
+        },
+        {
+          class: 'book',
+          score: 0.78,
+          bbox: [0.2, 0.3, 0.2, 0.3]
+        },
+        {
+          class: 'phone',
+          score: 0.75,
+          bbox: [0.5, 0.4, 0.15, 0.25]
+        }
+      ];
 
-                resolve({
-                  objectClass: bestDetection.class,
-                  confidence: bestDetection.score,
-                  bbox: bestDetection.bbox
-                });
-              } else {
-                resolve({
-                  objectClass: 'unknown',
-                  confidence: 0,
-                  bbox: [0, 0, 0, 0]
-                });
-              }
-            } catch (error) {
-              console.error('Error in model detection:', error);
-              resolve({
-                objectClass: 'unknown',
-                confidence: 0,
-                bbox: [0, 0, 0, 0]
-              });
-            }
-          };
-          
-          img.src = imageUri;
-        });
-      } else {
-        // Fallback to mock data
-        const mockDetections = [
-          {
-            class: 'person',
-            score: 0.95,
-            bbox: [0.1, 0.1, 0.3, 0.5]
-          },
-          {
-            class: 'car',
-            score: 0.87,
-            bbox: [0.4, 0.2, 0.4, 0.3]
-          },
-          {
-            class: 'bottle',
-            score: 0.82,
-            bbox: [0.7, 0.6, 0.1, 0.2]
-          }
-        ];
+      // Return a random object for demo
+      const randomDetection = mockDetections[Math.floor(Math.random() * mockDetections.length)];
 
-        // Return the object with highest confidence
-        const bestDetection = mockDetections.reduce((best, current) => 
-          current.score > best.score ? current : best
-        );
-
-        return {
-          objectClass: bestDetection.class,
-          confidence: bestDetection.score,
-          bbox: bestDetection.bbox
-        };
-      }
+      return {
+        objectClass: randomDetection.class,
+        confidence: randomDetection.score,
+        bbox: randomDetection.bbox
+      };
     } catch (error) {
       console.error('Error detecting objects:', error);
       return {

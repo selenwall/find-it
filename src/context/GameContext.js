@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Using localStorage instead of AsyncStorage for web
 
 const GameContext = createContext();
 
@@ -64,9 +64,9 @@ export const GameProvider = ({ children }) => {
 
   // Load saved data on app start
   useEffect(() => {
-    const loadGameData = async () => {
+    const loadGameData = () => {
       try {
-        const savedData = await AsyncStorage.getItem('gameData');
+        const savedData = localStorage.getItem('gameData');
         if (savedData) {
           const data = JSON.parse(savedData);
           dispatch({ type: 'SET_PLAYER', payload: data.currentPlayer });
@@ -81,9 +81,9 @@ export const GameProvider = ({ children }) => {
 
   // Save data when it changes
   useEffect(() => {
-    const saveGameData = async () => {
+    const saveGameData = () => {
       try {
-        await AsyncStorage.setItem('gameData', JSON.stringify({
+        localStorage.setItem('gameData', JSON.stringify({
           currentPlayer: state.currentPlayer,
           score: state.score,
         }));
