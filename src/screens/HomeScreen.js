@@ -8,6 +8,7 @@ const HomeScreen = () => {
   const navigate = useNavigate();
   const [playerName, setPlayerName] = useState(currentPlayer || '');
   const [friendName, setFriendName] = useState('');
+  const [hasGameLink, setHasGameLink] = useState(false);
 
   useEffect(() => {
     // Check for incoming game data from URL parameters
@@ -15,22 +16,22 @@ const HomeScreen = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const gameData = urlParams.get('game');
       if (gameData) {
+        setHasGameLink(true);
         try {
           const parsedData = JSON.parse(decodeURIComponent(gameData));
           if (parsedData.type === 'HITTA_GAME') {
-            dispatch({
-              type: 'START_GAME',
-              payload: parsedData,
-            });
-            navigate('/game');
+            // Don't auto-start game, just show join option
+            console.log('Game link detected:', parsedData);
           }
         } catch (error) {
           console.error('Error parsing game data:', error);
         }
+      } else {
+        setHasGameLink(false);
       }
     };
     checkForIncomingGame();
-  }, [dispatch, navigate]);
+  }, []);
 
   const handleSetPlayer = () => {
     if (playerName.trim()) {
@@ -127,36 +128,53 @@ const HomeScreen = () => {
         </div>
       </div>
 
-      <div className="card">
-        <h2>Spela</h2>
-        
-        <button className="btn btn-primary btn-large" onClick={handleStartNewGame}>
-          📸 Starta nytt spel
-        </button>
-
-        <div style={{ marginBottom: '15px' }}>
-          <input
-            className="input"
-            type="text"
-            placeholder="Ange motspelarens namn"
-            value={friendName}
-            onChange={(e) => setFriendName(e.target.value)}
-          />
+      {!hasGameLink ? (
+        <div className="card">
+          <h2>Spela</h2>
+          <p>Starta ett nytt spel och dela med en kompis!</p>
+          <button className="btn btn-primary btn-large" onClick={handleStartNewGame}>
+            📸 Starta nytt spel
+          </button>
         </div>
-        <button className="btn btn-secondary btn-large" onClick={handleJoinGame}>
-          🎮 Gå med i spel
-        </button>
-      </div>
+      ) : (
+        <div className="card">
+          <h2>Gå med i spel</h2>
+          <p>Du har fått en spellänk! Ange ditt namn och motspelarens namn för att gå med.</p>
+          
+          <div style={{ marginBottom: '15px' }}>
+            <input
+              className="input"
+              type="text"
+              placeholder="Ange motspelarens namn"
+              value={friendName}
+              onChange={(e) => setFriendName(e.target.value)}
+            />
+          </div>
+          <button className="btn btn-primary btn-large" onClick={handleJoinGame}>
+            🎮 Gå med i spel
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <h2>Så här spelar du:</h2>
-        <ol style={{ lineHeight: '1.6', color: '#666' }}>
-          <li>Ta ett foto på ett objekt</li>
-          <li>Objektet identifieras automatiskt</li>
-          <li>Dela spelet via länk till en kompis</li>
-          <li>Kompisen har 5 minuter att hitta samma typ av objekt</li>
-          <li>Få poäng för varje objekt du hittar!</li>
-        </ol>
+        {!hasGameLink ? (
+          <ol style={{ lineHeight: '1.6', color: '#666' }}>
+            <li>Ta ett foto på ett objekt</li>
+            <li>Objektet identifieras automatiskt</li>
+            <li>Dela spelet via länk till en kompis</li>
+            <li>Kompisen har 5 minuter att hitta samma typ av objekt</li>
+            <li>Få poäng för varje objekt du hittar!</li>
+          </ol>
+        ) : (
+          <ol style={{ lineHeight: '1.6', color: '#666' }}>
+            <li>Ange ditt namn och motspelarens namn</li>
+            <li>Klicka "Gå med i spel"</li>
+            <li>Du har 5 minuter att hitta objektet</li>
+            <li>Ta foto när du hittat det rätta objektet</li>
+            <li>Få poäng om du hittar rätt!</li>
+          </ol>
+        )}
       </div>
     </div>
   );
