@@ -21,6 +21,8 @@ const GameScreen = () => {
   const [stream, setStream] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [localTimeLeft, setLocalTimeLeft] = useState(300);
+  const [detectedObjects, setDetectedObjects] = useState([]);
+  const [showObjectSelector, setShowObjectSelector] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -147,22 +149,29 @@ const GameScreen = () => {
         const imageUrl = URL.createObjectURL(blob);
         
         // Detect objects in the image
-        const detection = await ObjectDetectionService.detectObjects(imageUrl);
+        const detections = await ObjectDetectionService.detectObjects(imageUrl);
         
-        // Check if the detected object matches the target
-        const isMatch = await ObjectDetectionService.matchObjects(targetObject, detection);
-        
-        if (isMatch) {
-          const confirmed = window.confirm(
-            `Match! 🎯 Du hittade en ${detection.objectClass}! Det matchar målet!`
-          );
-          if (confirmed) {
-            endGame(true);
-          }
+        if (Array.isArray(detections)) {
+          // Multiple objects detected - show selector
+          setDetectedObjects(detections);
+          setShowObjectSelector(true);
         } else {
-          alert(
-            `Inte rätt objekt. Du hittade en ${detection.objectClass}, men du letar efter en ${targetObject.objectClass}.`
-          );
+          // Single object detected - check match directly
+          const detection = detections;
+          const isMatch = await ObjectDetectionService.matchObjects(targetObject, detection);
+          
+          if (isMatch) {
+            const confirmed = window.confirm(
+              `Match! 🎯 Du hittade en ${detection.objectClass}! Det matchar målet!`
+            );
+            if (confirmed) {
+              endGame(true);
+            }
+          } else {
+            alert(
+              `Inte rätt objekt. Du hittade en ${detection.objectClass}, men du letar efter en ${targetObject.objectClass}.`
+            );
+          }
         }
         
         // Clean up
@@ -174,6 +183,33 @@ const GameScreen = () => {
         setIsProcessing(false);
       }
     }
+  };
+
+  const handleObjectSelect = async (selectedObject) => {
+    setShowObjectSelector(false);
+    
+    // Check if the selected object matches the target
+    const isMatch = await ObjectDetectionService.matchObjects(targetObject, selectedObject);
+    
+    if (isMatch) {
+      const confirmed = window.confirm(
+        `Match! 🎯 Du valde en ${selectedObject.objectClass}! Det matchar målet!`
+      );
+      if (confirmed) {
+        endGame(true);
+      }
+    } else {
+      alert(
+        `Inte rätt objekt. Du valde en ${selectedObject.objectClass}, men du letar efter en ${targetObject.objectClass}.`
+      );
+    }
+    
+    setDetectedObjects([]);
+  };
+
+  const handleCancelSelection = () => {
+    setShowObjectSelector(false);
+    setDetectedObjects([]);
   };
 
   const formatTime = (seconds) => {
@@ -238,6 +274,39 @@ const GameScreen = () => {
           </div>
         </div>
       </div>
+
+      {showObjectSelector && (
+        <div className="object-selector-overlay">
+          <div className="object-selector">
+            <h3>Välj objekt att kontrollera:</h3>
+            <div className="object-list">
+              {detectedObjects.map((obj, index) => (
+                <div 
+                  key={index} 
+                  className="object-option"
+                  onClick={() => handleObjectSelect(obj)}
+                >
+                  <div className="object-info">
+                    <span className="object-name">{obj.objectClass}</span>
+                    <span className="object-confidence">
+                      {Math.round(obj.confidence * 100)}% säker
+                    </span>
+                  </div>
+                  <div className="object-arrow">→</div>
+                </div>
+              ))}
+            </div>
+            <div className="object-selector-actions">
+              <button 
+                className="btn btn-secondary" 
+                onClick={handleCancelSelection}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="game-info">
         <p>{isProcessing ? 'Analyserar foto...' : 'Ta foto när du hittat objektet!'}</p>
