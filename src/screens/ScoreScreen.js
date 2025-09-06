@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { useNavigation } from '@react-navigation/native';
 import SMSService from '../services/SMSService';
 
 const ScoreScreen = () => {
   const { currentPlayer, score, players, dispatch } = useGame();
-  const navigation = useNavigation();
+  const navigate = useNavigate();
   const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
@@ -33,29 +25,22 @@ const ScoreScreen = () => {
   const shareScore = async () => {
     try {
       await SMSService.shareScore(currentPlayer, score, { objectClass: 'objekt' });
-      Alert.alert('Delat!', 'Din poäng har delats via SMS');
+      alert('Din poäng har delats!');
     } catch (error) {
       console.error('Error sharing score:', error);
-      Alert.alert('Fel', 'Kunde inte dela poängen');
+      alert('Kunde inte dela poängen');
     }
   };
 
   const resetScore = () => {
-    Alert.alert(
-      'Återställ poäng',
-      'Är du säker på att du vill återställa din poäng?',
-      [
-        { text: 'Avbryt', style: 'cancel' },
-        {
-          text: 'Återställ',
-          style: 'destructive',
-          onPress: () => {
-            dispatch({ type: 'UPDATE_SCORE', payload: 0 });
-            Alert.alert('Återställt', 'Din poäng har återställts');
-          },
-        },
-      ]
+    const confirmed = window.confirm(
+      'Är du säker på att du vill återställa din poäng?'
     );
+    
+    if (confirmed) {
+      dispatch({ type: 'UPDATE_SCORE', payload: 0 });
+      alert('Din poäng har återställts');
+    }
   };
 
   const getRankEmoji = (index) => {
@@ -68,244 +53,98 @@ const ScoreScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Poäng & Topplista</Text>
-      </View>
+    <div className="score-screen">
+      <div className="header">
+        <h1>Poäng & Topplista</h1>
+      </div>
 
-      <View style={styles.scoreCard}>
-        <Text style={styles.scoreLabel}>Din poäng</Text>
-        <Text style={styles.scoreValue}>{score}</Text>
-        <View style={styles.scoreActions}>
-          <TouchableOpacity style={styles.shareButton} onPress={shareScore}>
-            <Text style={styles.shareButtonText}>📤 Dela poäng</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.resetButton} onPress={resetScore}>
-            <Text style={styles.resetButtonText}>🔄 Återställ</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <div className="card">
+        <h2>Din poäng</h2>
+        <div className="score-display">{score}</div>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+          <button className="btn btn-secondary" onClick={shareScore}>
+            📤 Dela poäng
+          </button>
+          <button className="btn btn-danger" onClick={resetScore}>
+            🔄 Återställ
+          </button>
+        </div>
+      </div>
 
-      <View style={styles.leaderboardCard}>
-        <Text style={styles.leaderboardTitle}>Topplista</Text>
+      <div className="card">
+        <h2>Topplista</h2>
         {leaderboard.map((player, index) => (
-          <View
+          <div
             key={player.name}
-            style={[
-              styles.leaderboardItem,
-              player.name === currentPlayer && styles.currentPlayerItem,
-            ]}
+            className={`leaderboard-item ${player.name === currentPlayer ? 'current-player' : ''}`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px 0',
+              borderBottom: '1px solid #f0f0f0',
+              backgroundColor: player.name === currentPlayer ? '#E8F5E8' : 'transparent',
+              borderRadius: player.name === currentPlayer ? '8px' : '0',
+              margin: player.name === currentPlayer ? '2px 0' : '0'
+            }}
           >
-            <View style={styles.rankContainer}>
-              <Text style={styles.rankEmoji}>{getRankEmoji(index)}</Text>
-              <Text style={styles.rankNumber}>{index + 1}</Text>
-            </View>
-            <Text
-              style={[
-                styles.playerName,
-                player.name === currentPlayer && styles.currentPlayerName,
-              ]}
+            <div style={{ display: 'flex', alignItems: 'center', width: '60px' }}>
+              <span style={{ fontSize: '20px', marginRight: '5px' }}>{getRankEmoji(index)}</span>
+              <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#666' }}>{index + 1}</span>
+            </div>
+            <span
+              style={{
+                flex: 1,
+                fontSize: '16px',
+                marginLeft: '10px',
+                fontWeight: player.name === currentPlayer ? 'bold' : 'normal',
+                color: player.name === currentPlayer ? '#4CAF50' : '#333'
+              }}
             >
               {player.name}
-            </Text>
-            <Text style={styles.playerScore}>{player.score}</Text>
-          </View>
+            </span>
+            <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#4CAF50' }}>{player.score}</span>
+          </div>
         ))}
-      </View>
+      </div>
 
-      <View style={styles.achievementsCard}>
-        <Text style={styles.achievementsTitle}>Framsteg</Text>
-        <View style={styles.achievementItem}>
-          <Text style={styles.achievementEmoji}>🎯</Text>
-          <Text style={styles.achievementText}>
+      <div className="card">
+        <h2>Framsteg</h2>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0' }}>
+          <span style={{ fontSize: '24px', marginRight: '15px' }}>🎯</span>
+          <span style={{ fontSize: '16px', flex: 1 }}>
             {score >= 1 ? '✅' : '⏳'} Första objektet
-          </Text>
-        </View>
-        <View style={styles.achievementItem}>
-          <Text style={styles.achievementEmoji}>🔥</Text>
-          <Text style={styles.achievementText}>
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0' }}>
+          <span style={{ fontSize: '24px', marginRight: '15px' }}>🔥</span>
+          <span style={{ fontSize: '16px', flex: 1 }}>
             {score >= 5 ? '✅' : '⏳'} 5 objekt hittade
-          </Text>
-        </View>
-        <View style={styles.achievementItem}>
-          <Text style={styles.achievementEmoji}>💎</Text>
-          <Text style={styles.achievementText}>
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0' }}>
+          <span style={{ fontSize: '24px', marginRight: '15px' }}>💎</span>
+          <span style={{ fontSize: '16px', flex: 1 }}>
             {score >= 10 ? '✅' : '⏳'} 10 objekt hittade
-          </Text>
-        </View>
-        <View style={styles.achievementItem}>
-          <Text style={styles.achievementEmoji}>👑</Text>
-          <Text style={styles.achievementText}>
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0' }}>
+          <span style={{ fontSize: '24px', marginRight: '15px' }}>👑</span>
+          <span style={{ fontSize: '16px', flex: 1 }}>
             {score >= 25 ? '✅' : '⏳'} 25 objekt hittade
-          </Text>
-        </View>
-      </View>
+          </span>
+        </div>
+      </div>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Home')}
+      <div className="card">
+        <button
+          className="btn btn-primary btn-large"
+          onClick={() => navigate('/')}
         >
-          <Text style={styles.primaryButtonText}>🏠 Tillbaka till start</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          🏠 Tillbaka till start
+        </button>
+      </div>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#4CAF50',
-    padding: 30,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  scoreCard: {
-    backgroundColor: 'white',
-    margin: 15,
-    padding: 25,
-    borderRadius: 15,
-    alignItems: 'center',
-    elevation: 3,
-  },
-  scoreLabel: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 10,
-  },
-  scoreValue: {
-    fontSize: 64,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 20,
-  },
-  scoreActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  shareButton: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  shareButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  resetButton: {
-    backgroundColor: '#FF5722',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  resetButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  leaderboardCard: {
-    backgroundColor: 'white',
-    margin: 15,
-    padding: 20,
-    borderRadius: 15,
-    elevation: 3,
-  },
-  leaderboardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  leaderboardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  currentPlayerItem: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 8,
-    marginVertical: 2,
-  },
-  rankContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 60,
-  },
-  rankEmoji: {
-    fontSize: 20,
-    marginRight: 5,
-  },
-  rankNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
-  },
-  playerName: {
-    flex: 1,
-    fontSize: 16,
-    marginLeft: 10,
-  },
-  currentPlayerName: {
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  playerScore: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  achievementsCard: {
-    backgroundColor: 'white',
-    margin: 15,
-    padding: 20,
-    borderRadius: 15,
-    elevation: 3,
-  },
-  achievementsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  achievementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  achievementEmoji: {
-    fontSize: 24,
-    marginRight: 15,
-  },
-  achievementText: {
-    fontSize: 16,
-    flex: 1,
-  },
-  actions: {
-    padding: 15,
-  },
-  primaryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-});
 
 export default ScoreScreen;

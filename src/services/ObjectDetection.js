@@ -1,6 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-react-native';
-import '@tensorflow/tfjs-platform-react-native';
+import '@tensorflow/tfjs-models';
 
 class ObjectDetectionService {
   constructor() {
@@ -10,8 +9,9 @@ class ObjectDetectionService {
 
   async loadModel() {
     try {
-      // Load COCO-SSD model
-      this.model = await tf.loadLayersModel('https://tfhub.dev/tensorflow/tfjs-model/ssd_mobilenet_v2/1/default/1');
+      // Load COCO-SSD model using tfjs-models
+      const cocoSSD = await import('@tensorflow/tfjs-models/coco-ssd');
+      this.model = await cocoSSD.load();
       this.isModelLoaded = true;
       console.log('COCO-SSD model loaded successfully');
     } catch (error) {
@@ -27,36 +27,77 @@ class ObjectDetectionService {
     }
 
     try {
-      // For demo purposes, we'll simulate object detection
-      // In a real implementation, you would process the image with the model
-      const mockDetections = [
-        {
-          class: 'person',
-          score: 0.95,
-          bbox: [0.1, 0.1, 0.3, 0.5]
-        },
-        {
-          class: 'car',
-          score: 0.87,
-          bbox: [0.4, 0.2, 0.4, 0.3]
-        },
-        {
-          class: 'bottle',
-          score: 0.82,
-          bbox: [0.7, 0.6, 0.1, 0.2]
-        }
-      ];
+      if (this.model) {
+        // Use real COCO-SSD model
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        return new Promise((resolve) => {
+          img.onload = async () => {
+            try {
+              const predictions = await this.model.detect(img);
+              
+              if (predictions.length > 0) {
+                // Return the object with highest confidence
+                const bestDetection = predictions.reduce((best, current) => 
+                  current.score > best.score ? current : best
+                );
 
-      // Return the object with highest confidence
-      const bestDetection = mockDetections.reduce((best, current) => 
-        current.score > best.score ? current : best
-      );
+                resolve({
+                  objectClass: bestDetection.class,
+                  confidence: bestDetection.score,
+                  bbox: bestDetection.bbox
+                });
+              } else {
+                resolve({
+                  objectClass: 'unknown',
+                  confidence: 0,
+                  bbox: [0, 0, 0, 0]
+                });
+              }
+            } catch (error) {
+              console.error('Error in model detection:', error);
+              resolve({
+                objectClass: 'unknown',
+                confidence: 0,
+                bbox: [0, 0, 0, 0]
+              });
+            }
+          };
+          
+          img.src = imageUri;
+        });
+      } else {
+        // Fallback to mock data
+        const mockDetections = [
+          {
+            class: 'person',
+            score: 0.95,
+            bbox: [0.1, 0.1, 0.3, 0.5]
+          },
+          {
+            class: 'car',
+            score: 0.87,
+            bbox: [0.4, 0.2, 0.4, 0.3]
+          },
+          {
+            class: 'bottle',
+            score: 0.82,
+            bbox: [0.7, 0.6, 0.1, 0.2]
+          }
+        ];
 
-      return {
-        objectClass: bestDetection.class,
-        confidence: bestDetection.score,
-        bbox: bestDetection.bbox
-      };
+        // Return the object with highest confidence
+        const bestDetection = mockDetections.reduce((best, current) => 
+          current.score > best.score ? current : best
+        );
+
+        return {
+          objectClass: bestDetection.class,
+          confidence: bestDetection.score,
+          bbox: bestDetection.bbox
+        };
+      }
     } catch (error) {
       console.error('Error detecting objects:', error);
       return {

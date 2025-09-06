@@ -1,65 +1,84 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
-import { RNCamera } from 'react-native-camera';
+import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
-import { useNavigation } from '@react-navigation/native';
 import ObjectDetectionService from '../services/ObjectDetection';
 import SMSService from '../services/SMSService';
 
 const CameraScreen = () => {
   const { currentPlayer, dispatch } = useGame();
-  const navigation = useNavigation();
-  const cameraRef = useRef(null);
+  const navigate = useNavigate();
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [detectedObject, setDetectedObject] = useState(null);
+  const [stream, setStream] = useState(null);
 
   useEffect(() => {
     // Initialize object detection service
     ObjectDetectionService.loadModel();
+    startCamera();
+    
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
   }, []);
 
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Kunde inte komma åt kameran. Kontrollera behörigheter.');
+    }
+  };
+
   const takePicture = async () => {
-    if (cameraRef.current && !isProcessing) {
+    if (videoRef.current && canvasRef.current && !isProcessing) {
       try {
         setIsProcessing(true);
-        const options = {
-          quality: 0.8,
-          base64: false,
-          skipProcessing: false,
-        };
         
-        const data = await cameraRef.current.takePictureAsync(options);
-        console.log('Picture taken:', data.uri);
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
+        
+        // Set canvas size to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Draw video frame to canvas
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        const imageUrl = URL.createObjectURL(blob);
         
         // Detect objects in the image
-        const detection = await ObjectDetectionService.detectObjects(data.uri);
+        const detection = await ObjectDetectionService.detectObjects(imageUrl);
         setDetectedObject(detection);
         
-        Alert.alert(
-          'Objekt identifierat!',
-          `Jag hittade en ${detection.objectClass} (${Math.round(detection.confidence * 100)}% säker)`,
-          [
-            {
-              text: 'Ta nytt foto',
-              onPress: () => setDetectedObject(null),
-            },
-            {
-              text: 'Dela spelet',
-              onPress: () => shareGame(detection),
-            },
-          ]
+        const confirmed = window.confirm(
+          `Jag hittade en ${detection.objectClass} (${Math.round(detection.confidence * 100)}% säker). Vill du dela spelet?`
         );
+        
+        if (confirmed) {
+          await shareGame(detection);
+        } else {
+          setDetectedObject(null);
+        }
+        
+        // Clean up
+        URL.revokeObjectURL(imageUrl);
       } catch (error) {
         console.error('Error taking picture:', error);
-        Alert.alert('Fel', 'Kunde inte ta foto');
+        alert('Kunde inte ta foto');
       } finally {
         setIsProcessing(false);
       }
@@ -79,154 +98,60 @@ const CameraScreen = () => {
             timestamp: Date.now(),
           },
         });
-        navigation.navigate('Game');
+        navigate('/game');
       }
     } catch (error) {
       console.error('Error sharing game:', error);
-      Alert.alert('Fel', 'Kunde inte dela spelet');
+      alert('Kunde inte dela spelet');
     }
   };
 
   if (isProcessing) {
     return (
-      <View style={styles.processingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.processingText}>Analyserar foto...</Text>
-      </View>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Analyserar foto...</p>
+      </div>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <RNCamera
-        ref={cameraRef}
-        style={styles.camera}
-        type={RNCamera.Constants.Type.back}
-        flashMode={RNCamera.Constants.FlashMode.auto}
-        androidCameraPermissionOptions={{
-          title: 'Kamerabehörighet',
-          message: 'Appen behöver tillgång till kameran för att ta foton',
-          buttonPositive: 'OK',
-          buttonNegative: 'Avbryt',
-        }}
-        androidRecordAudioPermissionOptions={{
-          title: 'Mikrofonbehörighet',
-          message: 'Appen behöver tillgång till mikrofonen för videoinspelning',
-          buttonPositive: 'OK',
-          buttonNegative: 'Avbryt',
-        }}
-      />
-      
-      <View style={styles.overlay}>
-        <View style={styles.topOverlay}>
-          <Text style={styles.instructionText}>
-            Rikta kameran mot ett objekt
-          </Text>
-        </View>
+    <div className="camera-screen">
+      <div className="camera-container">
+        <video
+          ref={videoRef}
+          className="camera-video"
+          autoPlay
+          playsInline
+          muted
+        />
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
         
-        <View style={styles.bottomOverlay}>
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={takePicture}
-            disabled={isProcessing}
-          >
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
-        </View>
-      </View>
+        <div className="camera-overlay">
+          <div className="camera-top">
+            <p>Rikta kameran mot ett objekt</p>
+          </div>
+          
+          <div className="camera-bottom">
+            <button
+              className="capture-button"
+              onClick={takePicture}
+              disabled={isProcessing}
+            >
+              <div className="capture-button-inner"></div>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {detectedObject && (
-        <View style={styles.detectionOverlay}>
-          <Text style={styles.detectionText}>
-            Objekt: {detectedObject.objectClass}
-          </Text>
-          <Text style={styles.confidenceText}>
-            Säkerhet: {Math.round(detectedObject.confidence * 100)}%
-          </Text>
-        </View>
+        <div className="game-info">
+          <p><strong>Objekt:</strong> {detectedObject.objectClass}</p>
+          <p><strong>Säkerhet:</strong> {Math.round(detectedObject.confidence * 100)}%</p>
+        </div>
       )}
-    </View>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'space-between',
-  },
-  topOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 20,
-    paddingTop: 50,
-  },
-  instructionText: {
-    color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  bottomOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 30,
-    alignItems: 'center',
-  },
-  captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#4CAF50',
-  },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#4CAF50',
-  },
-  processingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'black',
-  },
-  processingText: {
-    color: 'white',
-    fontSize: 18,
-    marginTop: 20,
-  },
-  detectionOverlay: {
-    position: 'absolute',
-    top: 100,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 15,
-    borderRadius: 10,
-  },
-  detectionText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  confidenceText: {
-    color: 'white',
-    fontSize: 14,
-    marginTop: 5,
-  },
-});
 
 export default CameraScreen;
