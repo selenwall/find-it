@@ -251,19 +251,15 @@ const GameScreen = () => {
   }
 
   if (!isGameActive) {
-    console.log('GameScreen: No active game, isGameActive =', isGameActive);
     return (
       <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
         <h2>Inget aktivt spel</h2>
-        <p>isGameActive: {isGameActive ? 'true' : 'false'}</p>
         <button className="btn btn-primary" onClick={() => navigate('/')}>
           Tillbaka till start
         </button>
       </div>
     );
   }
-
-  console.log('GameScreen: Rendering game screen, targetObject =', targetObject);
 
   return (
     <div className="game-screen">

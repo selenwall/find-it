@@ -69,8 +69,12 @@ const gameReducer = (state, action) => {
         isMyTurn: !action.payload.isJoining, // Player1's turn when creating, Player2's turn when joining
         waitingForOpponent: false,
         // Set player info based on whether it's a new game or joining
-        player1: action.payload.isJoining ? state.player1 : { name: action.payload.playerName, score: state.player1.score },
-        player2: action.payload.isJoining ? { name: action.payload.playerName, score: state.player2.score } : state.player2,
+        player1: action.payload.isJoining ? 
+          { name: action.payload.player1Name || 'Spelare 1', score: state.player1.score } : 
+          { name: action.payload.playerName, score: state.player1.score },
+        player2: action.payload.isJoining ? 
+          { name: action.payload.playerName, score: state.player2.score } : 
+          { name: action.payload.player2Name || 'Spelare 2', score: state.player2.score },
         isPlayer1: !action.payload.isJoining,
       };
     case 'SHARE_GAME':
