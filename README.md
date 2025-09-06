@@ -13,7 +13,7 @@ Ett webbspel där spelare tar foton på objekt, delar dem via länk, och andra s
 
 ## Live Demo
 
-Spela spelet direkt: [https://yourusername.github.io/hitta-game](https://yourusername.github.io/hitta-game)
+Spela spelet direkt: [https://selenwall.github.io/find-it](https://selenwall.github.io/find-it)
 
 ## Teknisk stack
 
@@ -28,8 +28,8 @@ Spela spelet direkt: [https://yourusername.github.io/hitta-game](https://youruse
 
 1. Klona repot:
 ```bash
-git clone https://github.com/yourusername/hitta-game.git
-cd hitta-game
+git clone https://github.com/selenwall/find-it.git
+cd find-it
 ```
 
 2. Installera dependencies:
