@@ -54,7 +54,26 @@ const HomeScreen = () => {
       alert('Ange ditt namn först');
       return;
     }
-    alert('Funktionen för att gå med i spel kommer snart!');
+    // Check for incoming game data from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameData = urlParams.get('game');
+    if (gameData) {
+      try {
+        const parsedData = JSON.parse(decodeURIComponent(gameData));
+        if (parsedData.type === 'HITTA_GAME') {
+          dispatch({
+            type: 'START_GAME',
+            payload: parsedData,
+          });
+          navigate('/game');
+        }
+      } catch (error) {
+        console.error('Error parsing game data:', error);
+        alert('Kunde inte läsa speldata från länken');
+      }
+    } else {
+      alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
+    }
   };
 
   return (

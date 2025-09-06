@@ -20,6 +20,7 @@ const GameScreen = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [stream, setStream] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
+  const [localTimeLeft, setLocalTimeLeft] = useState(300);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -49,19 +50,26 @@ const GameScreen = () => {
   }, [isGameActive]);
 
   useEffect(() => {
-    if (timeLeft <= 0 && isGameActive) {
+    if (localTimeLeft <= 0 && isGameActive) {
       endGame(false);
     }
-  }, [timeLeft]);
+  }, [localTimeLeft]);
 
   const startGame = () => {
     setGameStarted(true);
+    setLocalTimeLeft(300); // Reset timer to 5 minutes
     startTimer();
   };
 
   const startTimer = () => {
     timerRef.current = setInterval(() => {
-      dispatch({ type: 'UPDATE_TIME', payload: timeLeft - 1 });
+      setLocalTimeLeft(prev => {
+        if (prev <= 1) {
+          stopTimer();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
   };
 
@@ -210,7 +218,7 @@ const GameScreen = () => {
         <div className="camera-overlay">
           <div className="camera-top">
             <div className="timer">
-              {formatTime(timeLeft)}
+              {formatTime(localTimeLeft)}
             </div>
             <p><strong>Hitta en: {targetObject.objectClass}</strong></p>
           </div>
