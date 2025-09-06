@@ -1,10 +1,12 @@
 // Web-based sharing service
 
 class SMSService {
-  async shareGame(targetObject, playerName) {
+  async shareGame(targetObject, playerName, player1Name, player2Name) {
     try {
       const gameData = {
-        obj: targetObject.objectClass
+        obj: targetObject.objectClass,
+        player1: player1Name,
+        player2: player2Name
       };
 
       const encodedData = encodeURIComponent(JSON.stringify(gameData));
@@ -71,6 +73,8 @@ class SMSService {
               confidence: 0.9 // Default confidence
             },
             playerName: 'Unknown',
+            player1Name: gameData.player1 || 'Spelare 1',
+            player2Name: gameData.player2 || 'Spelare 2',
             timestamp: Date.now()
           };
         }

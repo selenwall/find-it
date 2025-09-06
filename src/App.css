@@ -373,6 +373,35 @@
   margin-bottom: 5px;
 }
 
+/* Scores Display */
+.scores-display {
+  display: flex;
+  justify-content: space-around;
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.scores-display .score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.scores-display .player-name {
+  font-weight: bold;
+  color: #666;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+}
+
+.scores-display .score {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #4CAF50;
+}
+
 /* Additional styles for game screens */
 .camera-screen, .game-screen, .score-screen, .waiting-screen {
   min-height: 100vh;

@@ -10,7 +10,9 @@ const GameScreen = () => {
     targetObject, 
     timeLeft, 
     isGameActive, 
-    score, 
+    score,
+    player1,
+    player2,
     dispatch 
   } = useGame();
   const navigate = useNavigate();
@@ -277,6 +279,16 @@ const GameScreen = () => {
               {formatTime(localTimeLeft)}
             </div>
             <p><strong>Hitta en: {targetObject.objectClass}</strong></p>
+            <div className="scores-display">
+              <div className="score-item">
+                <span className="player-name">{player1.name || 'Spelare 1'}</span>
+                <span className="score">{player1.score}</span>
+              </div>
+              <div className="score-item">
+                <span className="player-name">{player2.name || 'Spelare 2'}</span>
+                <span className="score">{player2.score}</span>
+              </div>
+            </div>
           </div>
           
           <div className="camera-bottom">

@@ -9,8 +9,8 @@ const WaitingScreen = () => {
     targetObject, 
     waitingForOpponent, 
     gameState,
-    opponentScore,
-    score,
+    player1,
+    player2,
     dispatch 
   } = useGame();
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ const WaitingScreen = () => {
 
   const handleShareAgain = async () => {
     try {
-      const success = await SMSService.shareGame(targetObject, currentPlayer);
+      const success = await SMSService.shareGame(targetObject, currentPlayer, player1.name, player2.name);
       if (success) {
         alert('Spelet delades igen! 📱');
       }
@@ -62,12 +62,12 @@ const WaitingScreen = () => {
 
         <div className="scores">
           <div className="score-item">
-            <span className="player-name">Du ({currentPlayer})</span>
-            <span className="score">{score}</span>
+            <span className="player-name">{player1.name || 'Spelare 1'}</span>
+            <span className="score">{player1.score}</span>
           </div>
           <div className="score-item">
-            <span className="player-name">Motspelare</span>
-            <span className="score">{opponentScore}</span>
+            <span className="player-name">{player2.name || 'Spelare 2'}</span>
+            <span className="score">{player2.score}</span>
           </div>
         </div>
 

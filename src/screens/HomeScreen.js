@@ -4,7 +4,7 @@ import { useGame } from '../context/GameContext';
 import SMSService from '../services/SMSService';
 
 const HomeScreen = () => {
-  const { currentPlayer, score, dispatch } = useGame();
+  const { currentPlayer, score, player1, player2, dispatch } = useGame();
   const navigate = useNavigate();
   const [playerName, setPlayerName] = useState(currentPlayer || '');
   const [friendName, setFriendName] = useState('');
@@ -46,12 +46,18 @@ const HomeScreen = () => {
       alert('Ange ditt namn först');
       return;
     }
+    // Set player1 name when starting new game
+    dispatch({ type: 'SET_PLAYER1', payload: currentPlayer });
     navigate('/camera');
   };
 
   const handleJoinGame = () => {
     if (!currentPlayer) {
       alert('Ange ditt namn först');
+      return;
+    }
+    if (!friendName.trim()) {
+      alert('Ange motspelarens namn');
       return;
     }
     // Check for incoming game data from URL parameters
@@ -61,9 +67,11 @@ const HomeScreen = () => {
       try {
         const parsedData = JSON.parse(decodeURIComponent(gameData));
         if (parsedData.type === 'HITTA_GAME') {
+          // Set player2 name when joining
+          dispatch({ type: 'SET_PLAYER2', payload: friendName });
           dispatch({
             type: 'START_GAME',
-            payload: parsedData,
+            payload: { ...parsedData, isJoining: true },
           });
           navigate('/game');
         }
@@ -106,8 +114,17 @@ const HomeScreen = () => {
       </div>
 
       <div className="card">
-        <h2>Din poäng</h2>
-        <div className="score-display">{score}</div>
+        <h2>Poäng</h2>
+        <div className="scores-display">
+          <div className="score-item">
+            <span className="player-name">{player1.name || 'Spelare 1'}</span>
+            <span className="score">{player1.score}</span>
+          </div>
+          <div className="score-item">
+            <span className="player-name">{player2.name || 'Spelare 2'}</span>
+            <span className="score">{player2.score}</span>
+          </div>
+        </div>
       </div>
 
       <div className="card">
@@ -117,6 +134,15 @@ const HomeScreen = () => {
           📸 Starta nytt spel
         </button>
 
+        <div style={{ marginBottom: '15px' }}>
+          <input
+            className="input"
+            type="text"
+            placeholder="Ange motspelarens namn"
+            value={friendName}
+            onChange={(e) => setFriendName(e.target.value)}
+          />
+        </div>
         <button className="btn btn-secondary btn-large" onClick={handleJoinGame}>
           🎮 Gå med i spel
         </button>

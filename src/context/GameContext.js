@@ -18,12 +18,40 @@ const initialState = {
   isMyTurn: true,
   opponentScore: 0,
   waitingForOpponent: false,
+  // Both players info
+  player1: { name: null, score: 0 },
+  player2: { name: null, score: 0 },
+  isPlayer1: true, // true if current user is player1
 };
 
 const gameReducer = (state, action) => {
   switch (action.type) {
     case 'SET_PLAYER':
       return { ...state, currentPlayer: action.payload };
+    case 'SET_PLAYER1':
+      return { 
+        ...state, 
+        player1: { ...state.player1, name: action.payload },
+        isPlayer1: true 
+      };
+    case 'SET_PLAYER2':
+      return { 
+        ...state, 
+        player2: { ...state.player2, name: action.payload },
+        isPlayer1: false 
+      };
+    case 'UPDATE_PLAYER1_SCORE':
+      return { 
+        ...state, 
+        player1: { ...state.player1, score: action.payload },
+        score: state.isPlayer1 ? action.payload : state.score
+      };
+    case 'UPDATE_PLAYER2_SCORE':
+      return { 
+        ...state, 
+        player2: { ...state.player2, score: action.payload },
+        score: !state.isPlayer1 ? action.payload : state.score
+      };
     case 'ADD_PLAYER':
       return { 
         ...state, 
@@ -40,6 +68,10 @@ const gameReducer = (state, action) => {
         gameState: 'playing',
         isMyTurn: true,
         waitingForOpponent: false,
+        // Set player info based on whether it's a new game or joining
+        player1: action.payload.isJoining ? state.player1 : { name: action.payload.playerName, score: state.player1.score },
+        player2: action.payload.isJoining ? { name: action.payload.playerName, score: state.player2.score } : state.player2,
+        isPlayer1: !action.payload.isJoining,
       };
     case 'SHARE_GAME':
       return {
@@ -70,14 +102,18 @@ const gameReducer = (state, action) => {
     case 'UPDATE_TIME':
       return { ...state, timeLeft: action.payload };
     case 'FOUND_OBJECT':
+      const newScore = state.score + 1;
       return { 
         ...state, 
         foundObject: action.payload,
-        score: state.score + 1,
+        score: newScore,
         isGameActive: false,
         gameState: 'idle',
         isMyTurn: true,
         waitingForOpponent: false,
+        // Update the correct player's score
+        player1: state.isPlayer1 ? { ...state.player1, score: newScore } : state.player1,
+        player2: !state.isPlayer1 ? { ...state.player2, score: newScore } : state.player2,
       };
     case 'UPDATE_SCORE':
       return { ...state, score: action.payload };

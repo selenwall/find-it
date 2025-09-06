@@ -5,7 +5,7 @@ import ObjectDetectionService from '../services/ObjectDetection';
 import SMSService from '../services/SMSService';
 
 const CameraScreen = () => {
-  const { currentPlayer, dispatch } = useGame();
+  const { currentPlayer, player1, player2, dispatch } = useGame();
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -111,7 +111,7 @@ const CameraScreen = () => {
 
   const shareGame = async (object) => {
     try {
-      const success = await SMSService.shareGame(object, currentPlayer);
+      const success = await SMSService.shareGame(object, currentPlayer, player1.name, player2.name);
       if (success) {
         // Set up the game and enter waiting state
         dispatch({
