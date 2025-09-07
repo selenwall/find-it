@@ -34,28 +34,32 @@ const HomeScreen = () => {
   };
 
   const handleStartNewGame = () => {
-    if (!currentPlayer) {
+    const effectiveName = currentPlayer || playerName.trim();
+    if (!effectiveName) {
       alert('Ange ditt namn först');
       return;
     }
-    // Set player1 name when starting new game
-    dispatch({ type: 'SET_PLAYER1', payload: currentPlayer });
+    if (!currentPlayer) {
+      dispatch({ type: 'SET_PLAYER', payload: effectiveName });
+    }
+    dispatch({ type: 'SET_PLAYER1', payload: effectiveName });
     navigate('/camera');
   };
 
   const handleJoinGame = () => {
-    if (!currentPlayer) {
+    const effectiveName = currentPlayer || playerName.trim();
+    if (!effectiveName) {
       alert('Ange ditt namn först');
       return;
     }
-    // Use shared parser to handle both hash and search query formats
+    if (!currentPlayer) {
+      dispatch({ type: 'SET_PLAYER', payload: effectiveName });
+    }
     const parsedData = SMSService.parseGameData(window.location.href);
     if (parsedData && parsedData.type === 'HITTA_GAME') {
-      dispatch({ type: 'SET_PLAYER2', payload: currentPlayer });
-      dispatch({
-        type: 'START_GAME',
-        payload: { ...parsedData, isJoining: true },
-      });
+      const joinPayload = { ...parsedData, isJoining: true, playerName: effectiveName };
+      dispatch({ type: 'SET_PLAYER2', payload: effectiveName });
+      dispatch({ type: 'START_GAME', payload: joinPayload });
       navigate('/game');
     } else {
       alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
