@@ -60,7 +60,15 @@ const HomeScreen = () => {
       const joinPayload = { ...parsedData, isJoining: true, playerName: effectiveName };
       dispatch({ type: 'SET_PLAYER2', payload: effectiveName });
       dispatch({ type: 'START_GAME', payload: joinPayload });
-      navigate('/game');
+      try {
+        navigate('/game');
+        // HashRouter fallback
+        if (!window.location.hash.includes('/game')) {
+          window.location.hash = '#/game';
+        }
+      } catch (e) {
+        window.location.hash = '#/game';
+      }
     } else {
       alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
     }
