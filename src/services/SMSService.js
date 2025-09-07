@@ -10,7 +10,9 @@ class SMSService {
       };
 
       const encodedData = encodeURIComponent(JSON.stringify(gameData));
-      const shareUrl = `${window.location.origin}${window.location.pathname}?game=${encodedData}`;
+      // Ensure the URL uses hash routing so the app can read the query
+      const base = `${window.location.origin}${window.location.pathname}`;
+      const shareUrl = `${base}#/?game=${encodedData}`;
       
       const message = `🎯 Hitta! - ${playerName} utmanar dig!\n\nHitta en ${targetObject.objectClass}!\n\nDu har 5 minuter på dig!\n\nSpela här: ${shareUrl}`;
 
@@ -61,7 +63,18 @@ class SMSService {
   parseGameData(url) {
     try {
       const urlObj = new URL(url);
-      const gameParam = urlObj.searchParams.get('game');
+      // First, try standard search params
+      let gameParam = urlObj.searchParams.get('game');
+      // Fallback: parse from hash fragment (for HashRouter), e.g. #/?game=...
+      if (!gameParam && urlObj.hash) {
+        const hash = urlObj.hash.startsWith('#') ? urlObj.hash.slice(1) : urlObj.hash;
+        const queryIndex = hash.indexOf('?');
+        if (queryIndex !== -1) {
+          const hashQuery = hash.slice(queryIndex + 1);
+          const hashParams = new URLSearchParams(hashQuery);
+          gameParam = hashParams.get('game');
+        }
+      }
       if (gameParam) {
         const gameData = JSON.parse(decodeURIComponent(gameParam));
         if (gameData.obj) {
