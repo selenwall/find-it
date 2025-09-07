@@ -8,6 +8,7 @@ const HomeScreen = () => {
   const navigate = useNavigate();
   const [playerName, setPlayerName] = useState(currentPlayer || '');
   const [hasGameLink, setHasGameLink] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     // Check for incoming game data from URL (supports hash routing)
@@ -47,9 +48,12 @@ const HomeScreen = () => {
   };
 
   const handleJoinGame = () => {
+    if (isJoining) return;
+    setIsJoining(true);
     const effectiveName = currentPlayer || playerName.trim();
     if (!effectiveName) {
       alert('Ange ditt namn först');
+      setIsJoining(false);
       return;
     }
     if (!currentPlayer) {
@@ -69,8 +73,10 @@ const HomeScreen = () => {
       } catch (e) {
         window.location.hash = '#/game';
       }
+      setIsJoining(false);
     } else {
       alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
+      setIsJoining(false);
     }
   };
 
@@ -130,8 +136,8 @@ const HomeScreen = () => {
           <h2>Gå med i spel</h2>
           <p>Du har fått en spellänk! Ange ditt namn för att gå med i spelet.</p>
           
-          <button className="btn btn-primary btn-large" onClick={handleJoinGame}>
-            🎮 Gå med i spel
+          <button className="btn btn-primary btn-large" onClick={handleJoinGame} disabled={isJoining}>
+            {isJoining ? 'Ansluter…' : '🎮 Gå med i spel'}
           </button>
         </div>
       )}
