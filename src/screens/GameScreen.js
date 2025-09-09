@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import ObjectDetectionService from '../services/ObjectDetection';
@@ -6,88 +6,110 @@ import SMSService from '../services/SMSService';
 
 const GameScreen = () => {
   const { 
-    currentGame, 
-    targetObject, 
-    timeLeft, 
-    isGameActive, 
-    score,
+    targetObject,
+    timeLeft,
     player1,
     player2,
+    currentPlayerName,
+    isPlayer1,
     winner,
-    gameOver,
     dispatch 
   } = useGame();
+  
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef = useRef(null);
+  
   const [isProcessing, setIsProcessing] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [stream, setStream] = useState(null);
-  const [isModelLoading, setIsModelLoading] = useState(true);
   const [localTimeLeft, setLocalTimeLeft] = useState(120);
   const [detectedObjects, setDetectedObjects] = useState([]);
   const [showObjectSelector, setShowObjectSelector] = useState(false);
-  const timerRef = useRef(null);
+  const [isModelLoading, setIsModelLoading] = useState(true);
 
   useEffect(() => {
-    const initializeAI = async () => {
+    let mounted = true;
+
+    const initialize = async () => {
       try {
         await ObjectDetectionService.loadModel();
-        setIsModelLoading(false);
-        console.log('AI model ready for game');
+        if (mounted) {
+          setIsModelLoading(false);
+          await startCamera();
+          startTimer();
+        }
       } catch (error) {
-        console.error('Failed to load AI model:', error);
-        setIsModelLoading(false);
+        console.error('Failed to initialize:', error);
+        if (mounted) {
+          setIsModelLoading(false);
+        }
       }
     };
     
-    initializeAI();
-    
-    if (isGameActive && !gameStarted) {
-      startGame();
-      startCamera();
-    }
+    initialize();
+    dispatch({ type: 'SET_CAMERA_ACTIVE', payload: true });
     
     return () => {
+      mounted = false;
       stopCamera();
+      stopTimer();
+      dispatch({ type: 'SET_CAMERA_ACTIVE', payload: false });
     };
-  }, [isGameActive]);
+  }, [dispatch]);
 
   useEffect(() => {
-    if (localTimeLeft <= 0 && isGameActive) {
-      endGame(false);
+    if (localTimeLeft <= 0) {
+      handleTimeOut();
     }
   }, [localTimeLeft]);
 
-  // Start camera when component mounts and game is active
   useEffect(() => {
-    if (isGameActive && !isModelLoading) {
-      startCamera();
+    if (winner) {
+      stopCamera();
+      stopTimer();
+      const winnerName = winner === 'player1' ? player1.name : player2.name;
+      SMSService.shareWinner(winnerName, player1.score, player2.score);
+      alert(`🏆 ${winnerName} vann med 5 poäng!`);
+      navigate('/');
     }
-  }, [isGameActive, isModelLoading]);
+  }, [winner, player1, player2, navigate]);
 
-  // Also start camera when component mounts (for navigation from other screens)
-  useEffect(() => {
-    if (!isModelLoading && isGameActive) {
-      // Small delay to ensure video element is ready
-      const timer = setTimeout(() => {
-        startCamera();
-      }, 100);
-      return () => clearTimeout(timer);
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Camera access error:', error);
+      alert('Kunde inte starta kameran.');
     }
-  }, []);
+  };
 
-  const startGame = () => {
-    setGameStarted(true);
-    setLocalTimeLeft(120); // Reset timer to 2 minutes
-    startTimer();
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   };
 
   const startTimer = () => {
+    setLocalTimeLeft(120);
     timerRef.current = setInterval(() => {
       setLocalTimeLeft(prev => {
         if (prev <= 1) {
-          stopTimer();
           return 0;
         }
         return prev - 1;
@@ -102,157 +124,96 @@ const GameScreen = () => {
     }
   };
 
-  const startCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Kunde inte komma åt kameran. Kontrollera behörigheter.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    }
-  };
-
-  const endGame = (found) => {
+  const handleTimeOut = () => {
     stopTimer();
     stopCamera();
+    dispatch({ type: 'TIME_OUT' });
+    alert(`⏰ Tiden är ute! Du hittade inte ${targetObject?.objectClass} i tid.`);
     
-    if (found) {
-      dispatch({ type: 'FOUND_OBJECT', payload: targetObject });
-      
-      // Check if game is over (winner)
-      if (gameOver) {
-        const winnerName = winner === 'player1' ? player1.name : player2.name;
-        alert(`🎉 Spelet är slut! ${winnerName} vann med 5 poäng!`);
-        navigate('/home');
-        return;
-      }
-      
-      // Not game over - continue playing
-      const shareConfirmed = window.confirm(
-        `Grattis! 🎉 Du hittade en ${targetObject.objectClass}! Du får 1 poäng! Nu är det din tur att hitta något nytt. Vill du dela poängen?`
-      );
-      
-      if (shareConfirmed) {
-        shareScore();
-      }
-      
-      // After finding object, it's now your turn to find something new
-      dispatch({ type: 'END_GAME' });
-      navigate('/camera');
-    } else {
-      alert(
-        `Tiden är ute! ⏰ Du hittade inte en ${targetObject.objectClass} i tid. Bättre lycka nästa gång!`
-      );
-      dispatch({ type: 'END_GAME' });
-      navigate('/home');
-    }
-  };
-
-  const shareScore = async () => {
-    try {
-      await SMSService.shareScore(currentGame.playerName, score + 1, targetObject);
-    } catch (error) {
-      console.error('Error sharing score:', error);
-    }
+    // Dela att tiden gick ut
+    SMSService.shareFoundObject(
+      currentPlayerName,
+      player1.score,
+      player2.score,
+      { objectClass: 'inget (tiden gick ut)' }
+    );
+    
+    navigate('/camera');
   };
 
   const takePicture = async () => {
-    if (videoRef.current && canvasRef.current && !isProcessing && isGameActive) {
-      try {
-        setIsProcessing(true);
-        
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        
-        // Set canvas size to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Draw video frame to canvas
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Convert canvas to blob
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-        const imageUrl = URL.createObjectURL(blob);
-        
-        // Detect objects in the image
-        const detections = await ObjectDetectionService.detectObjects(imageUrl);
-        
-        if (Array.isArray(detections)) {
-          // Multiple objects detected - show selector
-          setDetectedObjects(detections);
-          setShowObjectSelector(true);
-        } else {
-          // Single object detected - check match directly
-          const detection = detections;
-          const isMatch = await ObjectDetectionService.matchObjects(targetObject, detection);
-          
-          if (isMatch) {
-            const confirmed = window.confirm(
-              `Match! 🎯 Du hittade en ${detection.objectClass}! Det matchar målet!`
-            );
-            if (confirmed) {
-              endGame(true);
-            }
-          } else {
-            alert(
-              `Inte rätt objekt. Du hittade en ${detection.objectClass}, men du letar efter en ${targetObject.objectClass}.`
-            );
-          }
-        }
-        
-        // Clean up
-        URL.revokeObjectURL(imageUrl);
-      } catch (error) {
-        console.error('Error taking picture:', error);
-        alert('Kunde inte ta foto');
-      } finally {
-        setIsProcessing(false);
+    if (!videoRef.current || !canvasRef.current || isProcessing) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const blob = await new Promise(resolve => 
+        canvas.toBlob(resolve, 'image/jpeg', 0.9)
+      );
+      const imageUrl = URL.createObjectURL(blob);
+      
+      const detections = await ObjectDetectionService.detectObjects(imageUrl);
+      
+      if (Array.isArray(detections) && detections.length > 0) {
+        setDetectedObjects(detections);
+        setShowObjectSelector(true);
+      } else if (detections && !Array.isArray(detections)) {
+        checkObject(detections);
+      } else {
+        alert('Inga objekt hittades. Försök igen!');
       }
+      
+      URL.revokeObjectURL(imageUrl);
+    } catch (error) {
+      console.error('Error taking picture:', error);
+      alert('Något gick fel. Försök igen!');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleObjectSelect = async (selectedObject) => {
+  const checkObject = async (selectedObject) => {
     setShowObjectSelector(false);
+    setDetectedObjects([]);
     
-    // Check if the selected object matches the target
-    const isMatch = await ObjectDetectionService.matchObjects(targetObject, selectedObject);
+    const isMatch = await ObjectDetectionService.matchObjects(
+      targetObject,
+      selectedObject
+    );
     
     if (isMatch) {
-      const confirmed = window.confirm(
-        `Match! 🎯 Du valde en ${selectedObject.objectClass}! Det matchar målet!`
+      stopTimer();
+      stopCamera();
+      
+      dispatch({ type: 'OBJECT_FOUND' });
+      
+      // Dela poäng
+      const newScore = isPlayer1 ? player1.score + 1 : player2.score + 1;
+      await SMSService.shareFoundObject(
+        currentPlayerName,
+        isPlayer1 ? newScore : player1.score,
+        !isPlayer1 ? newScore : player2.score,
+        selectedObject
       );
-      if (confirmed) {
-        endGame(true);
+      
+      if (newScore >= 5) {
+        // Spelet är slut, vinnare krönt
+        return;
       }
+      
+      alert(`🎉 Rätt! Du hittade ${selectedObject.objectClass}! Nu är det din tur att fotografera.`);
+      navigate('/camera');
     } else {
-      alert(
-        `Inte rätt objekt. Du valde en ${selectedObject.objectClass}, men du letar efter en ${targetObject.objectClass}.`
-      );
+      alert(`Det var ${selectedObject.objectClass}, inte ${targetObject.objectClass}. Försök igen!`);
     }
-    
-    setDetectedObjects([]);
-  };
-
-  const handleCancelSelection = () => {
-    setShowObjectSelector(false);
-    setDetectedObjects([]);
   };
 
   const formatTime = (seconds) => {
@@ -265,41 +226,17 @@ const GameScreen = () => {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Laddar AI-modell...</p>
-        <p style={{ fontSize: '14px', opacity: 0.7 }}>Förbereder objektigenkänning...</p>
+        <p>Förbereder...</p>
       </div>
     );
   }
 
-  if (gameOver) {
-    const winnerName = winner === 'player1' ? player1.name : player2.name;
+  if (!targetObject) {
     return (
-      <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
-        <h1>🎉 Spelet är slut!</h1>
-        <h2>{winnerName} vann!</h2>
-        <div className="scores-display">
-          <div className="score-item">
-            <span className="player-name">{player1.name}</span>
-            <span className="score">{player1.score}</span>
-          </div>
-          <div className="score-item">
-            <span className="player-name">{player2.name}</span>
-            <span className="score">{player2.score}</span>
-          </div>
-        </div>
+      <div className="error-screen">
+        <h2>Inget objekt att hitta</h2>
         <button className="btn btn-primary" onClick={() => navigate('/')}>
-          Tillbaka till start
-        </button>
-      </div>
-    );
-  }
-
-  if (!isGameActive) {
-    return (
-      <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
-        <h2>Inget aktivt spel</h2>
-        <button className="btn btn-primary" onClick={() => navigate('/')}>
-          Tillbaka till start
+          Tillbaka
         </button>
       </div>
     );
@@ -307,89 +244,73 @@ const GameScreen = () => {
 
   return (
     <div className="game-screen">
-      <div className="camera-container">
+      <div className="game-header">
+        <div className={`timer ${localTimeLeft < 30 ? 'timer-warning' : ''}`}>
+          {formatTime(localTimeLeft)}
+        </div>
+        <div className="target-display">
+          Hitta: <strong>{targetObject.objectClass}</strong>
+        </div>
+        <div className="game-score">
+          {player1.score} - {player2.score}
+        </div>
+      </div>
+
+      <div className="camera-viewport">
         <video
           ref={videoRef}
-          className="camera-video"
+          className="camera-feed"
           autoPlay
           playsInline
           muted
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
-        
-        <div className="camera-overlay">
-          <div className="camera-top">
-            <div className="timer">
-              {formatTime(localTimeLeft)}
-            </div>
-            <p><strong>Hitta en: {targetObject?.objectClass || 'Objekt'}</strong></p>
-            <div className="scores-display">
-              <div className="score-item">
-                <span className="player-name">{player1.name || 'Spelare 1'}</span>
-                <span className="score">{player1.score}</span>
-              </div>
-              <div className="score-item">
-                <span className="player-name">{player2.name || 'Spelare 2'}</span>
-                <span className="score">{player2.score}</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="camera-bottom">
-            <button
-              className={`capture-button ${(!isGameActive || isProcessing) ? 'disabled' : ''}`}
-              onClick={takePicture}
-              disabled={!isGameActive || isProcessing}
-            >
-              {isProcessing ? (
-                <div className="loading-spinner" style={{ width: '30px', height: '30px' }}></div>
-              ) : (
-                <div className="capture-button-inner"></div>
-              )}
-            </button>
-          </div>
-        </div>
+      </div>
+
+      <div className="camera-controls">
+        <button
+          className={`capture-btn ${isProcessing ? 'processing' : ''}`}
+          onClick={takePicture}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <div className="mini-spinner"></div>
+          ) : (
+            <div className="capture-icon"></div>
+          )}
+        </button>
       </div>
 
       {showObjectSelector && (
-        <div className="object-selector-overlay">
-          <div className="object-selector">
-            <h3>Välj objekt att kontrollera:</h3>
-            <div className="object-list">
+        <div className="modal-overlay">
+          <div className="object-selector-modal">
+            <h3>Välj vilket objekt du fotograferade:</h3>
+            <div className="objects-grid">
               {detectedObjects.map((obj, index) => (
-                <div 
-                  key={index} 
-                  className="object-option"
-                  onClick={() => handleObjectSelect(obj)}
+                <button
+                  key={index}
+                  className="object-card"
+                  onClick={() => checkObject(obj)}
                 >
-                  <div className="object-info">
-                    <span className="object-name">{obj.objectClass}</span>
-                    <span className="object-confidence">
-                      {Math.round(obj.confidence * 100)}% säker
-                    </span>
+                  <div className="object-name">{obj.objectClass}</div>
+                  <div className="object-confidence">
+                    {Math.round(obj.confidence * 100)}%
                   </div>
-                  <div className="object-arrow">→</div>
-                </div>
+                </button>
               ))}
             </div>
-            <div className="object-selector-actions">
-              <button 
-                className="btn btn-secondary" 
-                onClick={handleCancelSelection}
-              >
-                Avbryt
-              </button>
-            </div>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowObjectSelector(false);
+                setDetectedObjects([]);
+              }}
+            >
+              Ta om foto
+            </button>
           </div>
         </div>
       )}
-
-      <div className="game-info">
-        <p>{isProcessing ? 'Analyserar foto...' : 'Ta foto när du hittat objektet!'}</p>
-        {stream && (
-          <p className="camera-status">📹 Kameran är igång - leta efter objektet!</p>
-        )}
-      </div>
     </div>
   );
 };
