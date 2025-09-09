@@ -1,12 +1,14 @@
 // Web-based sharing service
 
 class SMSService {
-  async shareGame(targetObject, playerName, player1Name, player2Name) {
+  async shareGame(targetObject, playerName, player1Name, player2Name, player1Score = 0, player2Score = 0) {
     try {
       const gameData = {
         obj: targetObject.objectClass,
         player1: player1Name,
-        player2: player2Name
+        player2: player2Name,
+        player1Score: player1Score,
+        player2Score: player2Score
       };
 
       const encodedData = encodeURIComponent(JSON.stringify(gameData));
@@ -14,7 +16,7 @@ class SMSService {
       const base = `${window.location.origin}${window.location.pathname}`;
       const shareUrl = `${base}#/?game=${encodedData}`;
       
-      const message = `🎯 Hitta! - ${playerName} utmanar dig!\n\nHitta en ${targetObject.objectClass}!\n\nDu har 5 minuter på dig!\n\nSpela här: ${shareUrl}`;
+      const message = `🎯 Hitta! - ${playerName} utmanar dig!\n\nHitta en ${targetObject.objectClass}!\n\nDu har 2 minuter på dig!\n\nPoäng: ${player1Name} ${player1Score} - ${player2Name || 'Motspelare'} ${player2Score}\n\nSpela här: ${shareUrl}`;
 
       // Try to use Web Share API if available
       if (navigator.share) {
@@ -99,9 +101,9 @@ class SMSService {
     }
   }
 
-  async shareScore(playerName, score, foundObject) {
+  async shareScore(playerName, score, foundObject, player1Name, player2Name, player1Score, player2Score) {
     try {
-      const message = `🎉 ${playerName} hittade en ${foundObject.objectClass}!\n\nPoäng: ${score}\n\nBra jobbat! 🏆`;
+      const message = `🎉 ${playerName} hittade en ${foundObject.objectClass}!\n\nNuvarande poäng:\n${player1Name}: ${player1Score}\n${player2Name}: ${player2Score}\n\nBra jobbat! 🏆`;
 
       // Try to use Web Share API if available
       if (navigator.share) {

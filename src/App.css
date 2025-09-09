@@ -1,6 +1,9 @@
+/* Mobile-first minimalistic design */
 .App {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #333;
 }
 
 .loading-container {
@@ -9,7 +12,7 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-color: #4CAF50;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
 }
 
@@ -28,73 +31,83 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Header styles */
+/* Header styles - minimalistic */
 .header {
-  background-color: #4CAF50;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
   color: white;
-  padding: 2rem;
+  padding: 1.5rem 1rem;
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  border-radius: 0 0 20px 20px;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 2.5rem;
-  font-weight: bold;
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: 2px;
 }
 
 .header p {
   margin: 0.5rem 0 0 0;
-  font-size: 1.1rem;
-  opacity: 0.9;
+  font-size: 0.9rem;
+  opacity: 0.8;
+  font-weight: 300;
 }
 
-/* Card styles */
+/* Card styles - clean and minimal */
 .card {
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin: 1rem;
-  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin: 0.5rem;
+  padding: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .card h2 {
   margin: 0 0 1rem 0;
   color: #333;
-  font-size: 1.3rem;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
-/* Button styles */
+/* Button styles - modern and minimal */
 .btn {
   padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: bold;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 500;
   text-decoration: none;
   display: inline-block;
   text-align: center;
   cursor: pointer;
   border: none;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
-  background-color: #4CAF50;
+  background: linear-gradient(45deg, #667eea, #764ba2);
   color: white;
 }
 
 .btn-primary:hover {
-  background-color: #45a049;
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 .btn-secondary {
-  background-color: #2196F3;
+  background: rgba(255, 255, 255, 0.2);
   color: white;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .btn-secondary:hover {
-  background-color: #1976D2;
+  background: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
 }
 
@@ -110,24 +123,28 @@
 
 .btn-large {
   padding: 15px 30px;
-  font-size: 1.1rem;
+  font-size: 1rem;
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
-/* Input styles */
+/* Input styles - clean */
 .input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 25px;
   font-size: 1rem;
   margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  box-sizing: border-box;
 }
 
 .input:focus {
-  border-color: #4CAF50;
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 /* Score display */
@@ -139,15 +156,16 @@
   margin: 1rem 0;
 }
 
-/* Camera styles */
+/* Camera styles - clean and minimal */
 .camera-container {
   position: relative;
   width: 100%;
-  max-width: 500px;
-  margin: 0 auto;
+  max-width: 400px;
+  margin: 1rem auto;
   background: black;
-  border-radius: 10px;
+  border-radius: 20px;
   overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
 .camera-video {
@@ -169,43 +187,47 @@
 }
 
 .camera-top {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
   color: white;
-  padding: 20px;
+  padding: 15px;
   text-align: center;
 }
 
 .camera-bottom {
-  background: rgba(0, 0, 0, 0.7);
-  padding: 30px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 20px;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
 }
 
 .capture-button {
-  width: 80px;
-  height: 80px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   background: white;
-  border: 4px solid #4CAF50;
+  border: 3px solid #667eea;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: all;
-  transition: transform 0.2s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .capture-button:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .capture-button-inner {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
-  background: #4CAF50;
+  background: linear-gradient(45deg, #667eea, #764ba2);
 }
 
 /* Timer styles */
@@ -373,14 +395,16 @@
   margin-bottom: 5px;
 }
 
-/* Scores Display */
+/* Scores Display - minimal */
 .scores-display {
   display: flex;
   justify-content: space-around;
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 12px;
   margin: 10px 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .scores-display .score-item {
@@ -390,27 +414,27 @@
 }
 
 .scores-display .player-name {
-  font-weight: bold;
-  color: #666;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 4px;
+  font-size: 0.8rem;
 }
 
 .scores-display .score {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #4CAF50;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: white;
 }
 
 /* Additional styles for game screens */
-.camera-screen, .game-screen, .score-screen, .waiting-screen {
+.camera-screen, .game-screen {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .home-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .leaderboard-item {
@@ -588,19 +612,38 @@
   }
 }
 
-/* Responsive design */
+/* Mobile-first responsive design */
 @media (max-width: 768px) {
+  .header {
+    padding: 1rem 0.5rem;
+  }
+  
   .header h1 {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
   
   .card {
-    margin: 0.5rem;
+    margin: 0.3rem;
     padding: 1rem;
   }
   
   .btn-large {
-    padding: 12px 24px;
-    font-size: 1rem;
+    padding: 14px 20px;
+    font-size: 0.95rem;
+  }
+  
+  .camera-container {
+    margin: 0.5rem;
+    max-width: 100%;
+  }
+  
+  .capture-button {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .capture-button-inner {
+    width: 40px;
+    height: 40px;
   }
 }
