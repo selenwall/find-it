@@ -13,6 +13,8 @@ const GameScreen = () => {
     score,
     player1,
     player2,
+    winner,
+    gameOver,
     dispatch 
   } = useGame();
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ const GameScreen = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [stream, setStream] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
-  const [localTimeLeft, setLocalTimeLeft] = useState(300);
+  const [localTimeLeft, setLocalTimeLeft] = useState(120);
   const [detectedObjects, setDetectedObjects] = useState([]);
   const [showObjectSelector, setShowObjectSelector] = useState(false);
   const timerRef = useRef(null);
@@ -47,9 +49,7 @@ const GameScreen = () => {
     }
     
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopCamera();
     };
   }, [isGameActive]);
 
@@ -79,7 +79,7 @@ const GameScreen = () => {
 
   const startGame = () => {
     setGameStarted(true);
-    setLocalTimeLeft(300); // Reset timer to 5 minutes
+    setLocalTimeLeft(120); // Reset timer to 2 minutes
     startTimer();
   };
 
@@ -117,13 +117,34 @@ const GameScreen = () => {
     }
   };
 
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  };
+
   const endGame = (found) => {
     stopTimer();
+    stopCamera();
     
     if (found) {
       dispatch({ type: 'FOUND_OBJECT', payload: targetObject });
+      
+      // Check if game is over (winner)
+      if (gameOver) {
+        const winnerName = winner === 'player1' ? player1.name : player2.name;
+        alert(`🎉 Spelet är slut! ${winnerName} vann med 5 poäng!`);
+        navigate('/home');
+        return;
+      }
+      
+      // Not game over - continue playing
       const shareConfirmed = window.confirm(
-        `Grattis! 🎉 Du hittade en ${targetObject.objectClass}! Du får 1 poäng! Vill du dela poängen?`
+        `Grattis! 🎉 Du hittade en ${targetObject.objectClass}! Du får 1 poäng! Nu är det din tur att hitta något nytt. Vill du dela poängen?`
       );
       
       if (shareConfirmed) {
@@ -246,6 +267,29 @@ const GameScreen = () => {
         <div className="loading-spinner"></div>
         <p>Laddar AI-modell...</p>
         <p style={{ fontSize: '14px', opacity: 0.7 }}>Förbereder objektigenkänning...</p>
+      </div>
+    );
+  }
+
+  if (gameOver) {
+    const winnerName = winner === 'player1' ? player1.name : player2.name;
+    return (
+      <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
+        <h1>🎉 Spelet är slut!</h1>
+        <h2>{winnerName} vann!</h2>
+        <div className="scores-display">
+          <div className="score-item">
+            <span className="player-name">{player1.name}</span>
+            <span className="score">{player1.score}</span>
+          </div>
+          <div className="score-item">
+            <span className="player-name">{player2.name}</span>
+            <span className="score">{player2.score}</span>
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={() => navigate('/')}>
+          Tillbaka till start
+        </button>
       </div>
     );
   }

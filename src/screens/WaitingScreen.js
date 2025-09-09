@@ -73,7 +73,7 @@ const WaitingScreen = () => {
 
         <div className="waiting-message">
           <p>📱 Dela spelet med din kompis via SMS eller meddelanden</p>
-          <p>⏰ Motspelaren har 5 minuter på sig att hitta objektet</p>
+          <p>⏰ Motspelaren har 2 minuter på sig att hitta objektet</p>
         </div>
 
         <div className="waiting-actions">

@@ -9,7 +9,7 @@ const initialState = {
   currentGame: null,
   gameHistory: [],
   score: 0,
-  timeLeft: 300, // 5 minutes in seconds
+  timeLeft: 120, // 2 minutes in seconds
   isGameActive: false,
   targetObject: null,
   foundObject: null,
@@ -22,6 +22,8 @@ const initialState = {
   player1: { name: null, score: 0 },
   player2: { name: null, score: 0 },
   isPlayer1: true, // true if current user is player1
+  winner: null, // null, 'player1', or 'player2'
+  gameOver: false,
 };
 
 const gameReducer = (state, action) => {
@@ -62,7 +64,7 @@ const gameReducer = (state, action) => {
         ...state,
         currentGame: action.payload,
         isGameActive: true,
-        timeLeft: 300,
+        timeLeft: 120,
         targetObject: action.payload.targetObject,
         foundObject: null,
         gameState: 'playing',
@@ -107,20 +109,35 @@ const gameReducer = (state, action) => {
       return { ...state, timeLeft: action.payload };
     case 'FOUND_OBJECT':
       const newScore = state.score + 1;
+      const updatedPlayer1 = state.isPlayer1 ? { ...state.player1, score: newScore } : state.player1;
+      const updatedPlayer2 = !state.isPlayer1 ? { ...state.player2, score: newScore } : state.player2;
+      
+      // Check for winner (first to 5 points)
+      const winner = newScore >= 5 ? (state.isPlayer1 ? 'player1' : 'player2') : null;
+      const gameOver = winner !== null;
+      
       return { 
         ...state, 
         foundObject: action.payload,
         score: newScore,
-        isGameActive: false,
-        gameState: 'idle',
-        isMyTurn: true,
+        isGameActive: !gameOver,
+        gameState: gameOver ? 'game_over' : 'idle',
+        isMyTurn: !gameOver,
         waitingForOpponent: false,
-        // Update the correct player's score
-        player1: state.isPlayer1 ? { ...state.player1, score: newScore } : state.player1,
-        player2: !state.isPlayer1 ? { ...state.player2, score: newScore } : state.player2,
+        player1: updatedPlayer1,
+        player2: updatedPlayer2,
+        winner: winner,
+        gameOver: gameOver,
       };
     case 'UPDATE_SCORE':
       return { ...state, score: action.payload };
+    case 'STOP_CAMERA':
+      return {
+        ...state,
+        isGameActive: false,
+        gameState: 'idle',
+        waitingForOpponent: false,
+      };
     case 'RESET_GAME':
       return { ...initialState, players: state.players };
     default:

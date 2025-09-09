@@ -149,14 +149,14 @@ const HomeScreen = () => {
             <li>Ta ett foto på ett objekt</li>
             <li>Objektet identifieras automatiskt</li>
             <li>Dela spelet via länk till en kompis</li>
-            <li>Kompisen har 5 minuter att hitta samma typ av objekt</li>
+            <li>Kompisen har 2 minuter att hitta samma typ av objekt</li>
             <li>Få poäng för varje objekt du hittar!</li>
           </ol>
         ) : (
           <ol style={{ lineHeight: '1.6', color: '#666' }}>
             <li>Ange ditt namn</li>
             <li>Klicka "Gå med i spel"</li>
-            <li>Du har 5 minuter att hitta objektet</li>
+            <li>Du har 2 minuter att hitta objektet</li>
             <li>Ta foto när du hittat det rätta objektet</li>
             <li>Få poäng om du hittar rätt!</li>
           </ol>
