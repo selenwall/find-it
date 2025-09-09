@@ -1,145 +1,117 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-// Using localStorage instead of AsyncStorage for web
 
 const GameContext = createContext();
 
 const initialState = {
-  currentPlayer: null,
-  players: [],
-  currentGame: null,
-  gameHistory: [],
-  score: 0,
-  timeLeft: 120, // 2 minutes in seconds
-  isGameActive: false,
+  // Spelarinformation
+  player1: { name: '', score: 0 },
+  player2: { name: '', score: 0 },
+  currentPlayerName: '',
+  isPlayer1: true,
+  
+  // Spelstatus
+  gameActive: false,
+  isMyTurn: false,
   targetObject: null,
-  foundObject: null,
-  // Turn-based game states
-  gameState: 'idle', // 'idle', 'waiting_for_opponent', 'playing', 'opponent_found'
-  isMyTurn: true,
-  opponentScore: 0,
-  waitingForOpponent: false,
-  // Both players info
-  player1: { name: null, score: 0 },
-  player2: { name: null, score: 0 },
-  isPlayer1: true, // true if current user is player1
-  winner: null, // null, 'player1', or 'player2'
-  gameOver: false,
+  timeLeft: 120,
+  winner: null,
+  
+  // Kamerastatus
+  cameraActive: false,
 };
 
 const gameReducer = (state, action) => {
   switch (action.type) {
-    case 'SET_PLAYER':
-      return { ...state, currentPlayer: action.payload };
-    case 'SET_PLAYER1':
+    case 'SET_PLAYER_NAME':
       return { 
         ...state, 
-        player1: { ...state.player1, name: action.payload },
-        isPlayer1: true 
+        currentPlayerName: action.payload 
       };
-    case 'SET_PLAYER2':
-      return { 
-        ...state, 
-        player2: { ...state.player2, name: action.payload },
-        isPlayer1: false 
-      };
-    case 'UPDATE_PLAYER1_SCORE':
-      return { 
-        ...state, 
-        player1: { ...state.player1, score: action.payload },
-        score: state.isPlayer1 ? action.payload : state.score
-      };
-    case 'UPDATE_PLAYER2_SCORE':
-      return { 
-        ...state, 
-        player2: { ...state.player2, score: action.payload },
-        score: !state.isPlayer1 ? action.payload : state.score
-      };
-    case 'ADD_PLAYER':
-      return { 
-        ...state, 
-        players: [...state.players, action.payload] 
-      };
-    case 'START_GAME':
+      
+    case 'START_NEW_GAME':
       return {
         ...state,
-        currentGame: action.payload,
-        isGameActive: true,
-        timeLeft: 120,
+        player1: { name: state.currentPlayerName, score: 0 },
+        player2: { name: '', score: 0 },
+        isPlayer1: true,
+        gameActive: true,
+        isMyTurn: true,
+        targetObject: null,
+        winner: null,
+      };
+      
+    case 'JOIN_GAME':
+      return {
+        ...state,
+        player1: { name: action.payload.player1Name, score: action.payload.player1Score || 0 },
+        player2: { name: state.currentPlayerName, score: action.payload.player2Score || 0 },
+        isPlayer1: false,
+        gameActive: true,
+        isMyTurn: true,
         targetObject: action.payload.targetObject,
-        foundObject: null,
-        gameState: 'playing',
-        isMyTurn: !action.payload.isJoining, // Player1's turn when creating, Player2's turn when joining
-        waitingForOpponent: false,
-        // Set player info based on whether it's a new game or joining
-        player1: action.payload.isJoining ? 
-          { name: action.payload.player1Name || 'Spelare 1', score: state.player1.score } : 
-          { name: action.payload.playerName, score: state.player1.score },
-        player2: action.payload.isJoining ? 
-          { name: action.payload.playerName, score: state.player2.score } : 
-          { name: action.payload.player2Name || 'Spelare 2', score: state.player2.score },
-        isPlayer1: !action.payload.isJoining,
+        timeLeft: 120,
+        winner: null,
       };
-    case 'SHARE_GAME':
+      
+    case 'SET_TARGET_OBJECT':
       return {
         ...state,
-        gameState: 'waiting_for_opponent',
-        waitingForOpponent: true,
+        targetObject: action.payload,
         isMyTurn: false,
       };
-    case 'OPPONENT_FOUND_OBJECT':
-      return {
+      
+    case 'OBJECT_FOUND':
+      const currentPlayer = state.isPlayer1 ? 'player1' : 'player2';
+      const newScore = state[currentPlayer].score + 1;
+      const updatedState = {
         ...state,
-        gameState: 'opponent_found',
-        waitingForOpponent: false,
+        [currentPlayer]: { ...state[currentPlayer], score: newScore },
         isMyTurn: true,
-        opponentScore: state.opponentScore + 1,
-      };
-    case 'END_GAME':
-      return {
-        ...state,
-        isGameActive: false,
-        currentGame: null,
         targetObject: null,
-        foundObject: null,
-        gameState: 'idle',
-        waitingForOpponent: false,
-        isMyTurn: true,
+        timeLeft: 120,
       };
-    case 'UPDATE_TIME':
-      return { ...state, timeLeft: action.payload };
-    case 'FOUND_OBJECT':
-      const newScore = state.score + 1;
-      const updatedPlayer1 = state.isPlayer1 ? { ...state.player1, score: newScore } : state.player1;
-      const updatedPlayer2 = !state.isPlayer1 ? { ...state.player2, score: newScore } : state.player2;
       
-      // Check for winner (first to 5 points)
-      const winner = newScore >= 5 ? (state.isPlayer1 ? 'player1' : 'player2') : null;
-      const gameOver = winner !== null;
+      // Kolla om någon vunnit (först till 5)
+      if (newScore >= 5) {
+        updatedState.winner = currentPlayer;
+        updatedState.gameActive = false;
+      }
       
-      return { 
-        ...state, 
-        foundObject: action.payload,
-        score: newScore,
-        isGameActive: !gameOver,
-        gameState: gameOver ? 'game_over' : 'idle',
-        isMyTurn: !gameOver,
-        waitingForOpponent: false,
-        player1: updatedPlayer1,
-        player2: updatedPlayer2,
-        winner: winner,
-        gameOver: gameOver,
-      };
-    case 'UPDATE_SCORE':
-      return { ...state, score: action.payload };
-    case 'STOP_CAMERA':
+      return updatedState;
+      
+    case 'TIME_OUT':
       return {
         ...state,
-        isGameActive: false,
-        gameState: 'idle',
-        waitingForOpponent: false,
+        isMyTurn: true,
+        targetObject: null,
+        timeLeft: 120,
       };
+      
+    case 'UPDATE_TIME':
+      return {
+        ...state,
+        timeLeft: action.payload,
+      };
+      
+    case 'SET_CAMERA_ACTIVE':
+      return {
+        ...state,
+        cameraActive: action.payload,
+      };
+      
     case 'RESET_GAME':
-      return { ...initialState, players: state.players };
+      return {
+        ...initialState,
+        currentPlayerName: state.currentPlayerName,
+      };
+      
+    case 'UPDATE_SCORES':
+      return {
+        ...state,
+        player1: { ...state.player1, score: action.payload.player1Score },
+        player2: { ...state.player2, score: action.payload.player2Score },
+      };
+      
     default:
       return state;
   }
@@ -148,37 +120,19 @@ const gameReducer = (state, action) => {
 export const GameProvider = ({ children }) => {
   const [state, dispatch] = useReducer(gameReducer, initialState);
 
-  // Load saved data on app start
+  // Spara spelarnamn i localStorage
   useEffect(() => {
-    const loadGameData = () => {
-      try {
-        const savedData = localStorage.getItem('gameData');
-        if (savedData) {
-          const data = JSON.parse(savedData);
-          dispatch({ type: 'SET_PLAYER', payload: data.currentPlayer });
-          dispatch({ type: 'UPDATE_SCORE', payload: data.score });
-        }
-      } catch (error) {
-        console.error('Error loading game data:', error);
-      }
-    };
-    loadGameData();
+    const savedName = localStorage.getItem('playerName');
+    if (savedName) {
+      dispatch({ type: 'SET_PLAYER_NAME', payload: savedName });
+    }
   }, []);
 
-  // Save data when it changes
   useEffect(() => {
-    const saveGameData = () => {
-      try {
-        localStorage.setItem('gameData', JSON.stringify({
-          currentPlayer: state.currentPlayer,
-          score: state.score,
-        }));
-      } catch (error) {
-        console.error('Error saving game data:', error);
-      }
-    };
-    saveGameData();
-  }, [state.currentPlayer, state.score]);
+    if (state.currentPlayerName) {
+      localStorage.setItem('playerName', state.currentPlayerName);
+    }
+  }, [state.currentPlayerName]);
 
   const value = {
     ...state,

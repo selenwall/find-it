@@ -1,61 +1,89 @@
-// Web-based sharing service
-
 class SMSService {
-  async shareGame(targetObject, playerName, player1Name, player2Name) {
+  async shareChallenge(targetObject, player1Name, player1Score, player2Score) {
     try {
       const gameData = {
         obj: targetObject.objectClass,
-        player1: player1Name,
-        player2: player2Name
+        p1: player1Name,
+        p1s: player1Score,
+        p2s: player2Score || 0,
+        t: Date.now()
       };
 
       const encodedData = encodeURIComponent(JSON.stringify(gameData));
-      // Ensure the URL uses hash routing so the app can read the query
       const base = `${window.location.origin}${window.location.pathname}`;
       const shareUrl = `${base}#/?game=${encodedData}`;
       
-      const message = `🎯 Hitta! - ${playerName} utmanar dig!\n\nHitta en ${targetObject.objectClass}!\n\nDu har 5 minuter på dig!\n\nSpela här: ${shareUrl}`;
+      const scoreText = `${player1Name}: ${player1Score} poäng\nMotspelare: ${player2Score || 0} poäng\n\n`;
+      const message = `🎯 Hitta-utmaning!\n\n${scoreText}Hitta en "${targetObject.objectClass}"!\nDu har 2 minuter på dig.\n\n${shareUrl}`;
 
-      // Try to use Web Share API if available
+      // Försök använda Web Share API först
       if (navigator.share) {
         try {
           await navigator.share({
             title: 'Hitta! - Spelutmaning',
-            text: message,
-            url: shareUrl
+            text: message
           });
           return true;
         } catch (error) {
-          console.log('Web Share API failed, falling back to clipboard');
+          if (error.name !== 'AbortError') {
+            console.log('Web Share API failed, falling back');
+          }
         }
       }
 
-      // Fallback to clipboard
+      // Fallback till clipboard
       try {
         await navigator.clipboard.writeText(message);
-        alert('Spellänk kopierad till urklipp! Dela den med din kompis via SMS eller meddelanden.');
+        alert('Utmaning kopierad! Klistra in i SMS, WhatsApp eller annan meddelandeapp.');
         return true;
       } catch (error) {
-        console.error('Clipboard API failed:', error);
-        // Final fallback - show the URL
-        const confirmed = window.confirm(
-          `Kopiera denna länk och dela med din kompis:\n\n${shareUrl}\n\nKlicka OK för att kopiera.`
-        );
-        if (confirmed) {
-          // Try to select the text
-          const textArea = document.createElement('textarea');
-          textArea.value = shareUrl;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-          alert('Länk kopierad!');
-        }
+        // Sista fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = message;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('Utmaning kopierad!');
         return true;
       }
     } catch (error) {
-      console.error('Error sharing game:', error);
-      alert('Kunde inte dela spelet');
+      console.error('Error sharing challenge:', error);
+      alert('Kunde inte dela utmaningen');
+      return false;
+    }
+  }
+
+  async shareFoundObject(playerName, player1Score, player2Score, foundObject) {
+    try {
+      const message = `🎉 ${playerName} hittade "${foundObject.objectClass}"!\n\nPoängställning:\nSpelare 1: ${player1Score} poäng\nSpelare 2: ${player2Score} poäng\n\n${player1Score >= 5 || player2Score >= 5 ? '🏆 Spelet är slut!' : 'Nu är det din tur att fotografera något!'}`;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'Hitta! - Poäng',
+            text: message
+          });
+          return true;
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.log('Web Share API failed, falling back');
+          }
+        }
+      }
+
+      try {
+        await navigator.clipboard.writeText(message);
+        alert('Meddelande kopierat!');
+        return true;
+      } catch (error) {
+        alert(message);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error sharing score:', error);
       return false;
     }
   }
@@ -63,9 +91,9 @@ class SMSService {
   parseGameData(url) {
     try {
       const urlObj = new URL(url);
-      // First, try standard search params
       let gameParam = urlObj.searchParams.get('game');
-      // Fallback: parse from hash fragment (for HashRouter), e.g. #/?game=...
+      
+      // Kolla i hash för HashRouter
       if (!gameParam && urlObj.hash) {
         const hash = urlObj.hash.startsWith('#') ? urlObj.hash.slice(1) : urlObj.hash;
         const queryIndex = hash.indexOf('?');
@@ -75,22 +103,19 @@ class SMSService {
           gameParam = hashParams.get('game');
         }
       }
+      
       if (gameParam) {
         const gameData = JSON.parse(decodeURIComponent(gameParam));
-        if (gameData.obj) {
-          // Convert back to the expected format
-          return {
-            type: 'HITTA_GAME',
-            targetObject: {
-              objectClass: gameData.obj,
-              confidence: 0.9 // Default confidence
-            },
-            playerName: 'Unknown',
-            player1Name: gameData.player1 || 'Spelare 1',
-            player2Name: gameData.player2 || 'Spelare 2',
-            timestamp: Date.now()
-          };
-        }
+        return {
+          targetObject: {
+            objectClass: gameData.obj,
+            confidence: 0.9
+          },
+          player1Name: gameData.p1,
+          player1Score: gameData.p1s || 0,
+          player2Score: gameData.p2s || 0,
+          timestamp: gameData.t
+        };
       }
       return null;
     } catch (error) {
@@ -99,36 +124,34 @@ class SMSService {
     }
   }
 
-  async shareScore(playerName, score, foundObject) {
+  async shareWinner(winnerName, player1Score, player2Score) {
     try {
-      const message = `🎉 ${playerName} hittade en ${foundObject.objectClass}!\n\nPoäng: ${score}\n\nBra jobbat! 🏆`;
+      const message = `🏆 ${winnerName} vann Hitta!\n\nSlutresultat:\nSpelare 1: ${player1Score} poäng\nSpelare 2: ${player2Score} poäng\n\nGrattis! 🎉`;
 
-      // Try to use Web Share API if available
       if (navigator.share) {
         try {
           await navigator.share({
-            title: 'Hitta! - Poänguppdatering',
+            title: 'Hitta! - Vinnare',
             text: message
           });
           return true;
         } catch (error) {
-          console.log('Web Share API failed, falling back to clipboard');
+          if (error.name !== 'AbortError') {
+            console.log('Web Share API failed');
+          }
         }
       }
 
-      // Fallback to clipboard
       try {
         await navigator.clipboard.writeText(message);
-        alert('Poänguppdatering kopierad till urklipp!');
+        alert('Vinnarmeddelande kopierat!');
         return true;
       } catch (error) {
-        console.error('Clipboard API failed:', error);
         alert(message);
         return true;
       }
     } catch (error) {
-      console.error('Error sharing score:', error);
-      alert('Kunde inte dela poängen');
+      console.error('Error sharing winner:', error);
       return false;
     }
   }
