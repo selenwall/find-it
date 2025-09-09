@@ -5,12 +5,11 @@ import ObjectDetectionService from '../services/ObjectDetection';
 import SMSService from '../services/SMSService';
 
 const CameraScreen = () => {
-  const { currentPlayer, player1, player2, dispatch } = useGame();
+  const { player1, player2, dispatch } = useGame();
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [detectedObject, setDetectedObject] = useState(null);
   const [detectedObjects, setDetectedObjects] = useState([]);
   const [showObjectSelector, setShowObjectSelector] = useState(false);
   const [stream, setStream] = useState(null);
@@ -33,11 +32,19 @@ const CameraScreen = () => {
     startCamera();
     
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopCamera();
     };
   }, []);
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -83,7 +90,6 @@ const CameraScreen = () => {
           setShowObjectSelector(true);
         } else {
           // Single object detected
-          setDetectedObject(detections);
           setDetectedObjects([detections]);
           
           const confirmed = window.confirm(
@@ -93,7 +99,6 @@ const CameraScreen = () => {
           if (confirmed) {
             await shareGame(detections);
           } else {
-            setDetectedObject(null);
             setDetectedObjects([]);
           }
         }
@@ -111,23 +116,20 @@ const CameraScreen = () => {
 
   const shareGame = async (object) => {
     try {
-      const success = await SMSService.shareGame(object, currentPlayer, player1.name, player2.name);
+      const success = await SMSService.shareGame(
+        object, 
+        player1.name, 
+        player1.name, 
+        player2.name, 
+        player1.score, 
+        player2.score
+      );
       if (success) {
-        // Set up the game and enter waiting state
-        dispatch({
-          type: 'START_GAME',
-          payload: {
-            targetObject: object,
-            playerName: currentPlayer,
-            timestamp: Date.now(),
-          },
-        });
-        
-        // Enter waiting state for opponent
-        dispatch({ type: 'SHARE_GAME' });
-        
-        // Navigate to waiting screen
-        navigate('/waiting');
+        // Store the object to share and navigate back to home
+        dispatch({ type: 'SHARE_OBJECT', payload: object });
+        stopCamera();
+        navigate('/');
+        alert('Spelet delat! Vänta på att din kompis ska gå med i spelet.');
       }
     } catch (error) {
       console.error('Error sharing game:', error);
@@ -136,7 +138,6 @@ const CameraScreen = () => {
   };
 
   const handleObjectSelect = async (selectedObject) => {
-    setDetectedObject(selectedObject);
     setShowObjectSelector(false);
     
     const confirmed = window.confirm(
@@ -146,7 +147,6 @@ const CameraScreen = () => {
     if (confirmed) {
       await shareGame(selectedObject);
     } else {
-      setDetectedObject(null);
       setDetectedObjects([]);
     }
   };
@@ -154,7 +154,11 @@ const CameraScreen = () => {
   const handleCancelSelection = () => {
     setShowObjectSelector(false);
     setDetectedObjects([]);
-    setDetectedObject(null);
+  };
+
+  const handleGoBack = () => {
+    stopCamera();
+    navigate('/');
   };
 
   if (isModelLoading) {
@@ -190,10 +194,23 @@ const CameraScreen = () => {
         
         <div className="camera-overlay">
           <div className="camera-top">
+            <div className="scores-display">
+              <div className="score-item">
+                <span className="player-name">{player1.name || 'Spelare 1'}</span>
+                <span className="score">{player1.score}</span>
+              </div>
+              <div className="score-item">
+                <span className="player-name">{player2.name || 'Spelare 2'}</span>
+                <span className="score">{player2.score}</span>
+              </div>
+            </div>
             <p>Rikta kameran mot ett objekt</p>
           </div>
           
           <div className="camera-bottom">
+            <button className="btn btn-secondary" onClick={handleGoBack}>
+              ← Tillbaka
+            </button>
             <button
               className="capture-button"
               onClick={takePicture}
@@ -238,12 +255,6 @@ const CameraScreen = () => {
         </div>
       )}
 
-      {detectedObject && !showObjectSelector && (
-        <div className="game-info">
-          <p><strong>Objekt:</strong> {detectedObject.objectClass}</p>
-          <p><strong>Säkerhet:</strong> {Math.round(detectedObject.confidence * 100)}%</p>
-        </div>
-      )}
     </div>
   );
 };

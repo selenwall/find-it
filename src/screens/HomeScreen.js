@@ -4,9 +4,9 @@ import { useGame } from '../context/GameContext';
 import SMSService from '../services/SMSService';
 
 const HomeScreen = () => {
-  const { currentPlayer, score, player1, player2, dispatch } = useGame();
+  const { player1, player2, gameOver, winner, dispatch } = useGame();
   const navigate = useNavigate();
-  const [playerName, setPlayerName] = useState(currentPlayer || '');
+  const [playerName, setPlayerName] = useState('');
   const [hasGameLink, setHasGameLink] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
@@ -25,54 +25,31 @@ const HomeScreen = () => {
     checkForIncomingGame();
   }, []);
 
-  const handleSetPlayer = () => {
-    if (playerName.trim()) {
-      dispatch({ type: 'SET_PLAYER', payload: playerName.trim() });
-      alert(`Välkommen ${playerName}!`);
-    } else {
-      alert('Ange ett namn');
-    }
-  };
-
   const handleStartNewGame = () => {
-    const effectiveName = currentPlayer || playerName.trim();
-    if (!effectiveName) {
+    if (!playerName.trim()) {
       alert('Ange ditt namn först');
       return;
     }
-    if (!currentPlayer) {
-      dispatch({ type: 'SET_PLAYER', payload: effectiveName });
-    }
-    dispatch({ type: 'SET_PLAYER1', payload: effectiveName });
+    dispatch({ type: 'SET_PLAYER1', payload: playerName.trim() });
     navigate('/camera');
   };
 
   const handleJoinGame = () => {
     if (isJoining) return;
     setIsJoining(true);
-    const effectiveName = currentPlayer || playerName.trim();
-    if (!effectiveName) {
+    
+    if (!playerName.trim()) {
       alert('Ange ditt namn först');
       setIsJoining(false);
       return;
     }
-    if (!currentPlayer) {
-      dispatch({ type: 'SET_PLAYER', payload: effectiveName });
-    }
+    
     const parsedData = SMSService.parseGameData(window.location.href);
     if (parsedData && parsedData.type === 'HITTA_GAME') {
-      const joinPayload = { ...parsedData, isJoining: true, playerName: effectiveName };
-      dispatch({ type: 'SET_PLAYER2', payload: effectiveName });
+      const joinPayload = { ...parsedData, isJoining: true, playerName: playerName.trim() };
+      dispatch({ type: 'SET_PLAYER2', payload: playerName.trim() });
       dispatch({ type: 'START_GAME', payload: joinPayload });
-      try {
-        navigate('/game');
-        // HashRouter fallback
-        if (!window.location.hash.includes('/game')) {
-          window.location.hash = '#/game';
-        }
-      } catch (e) {
-        window.location.hash = '#/game';
-      }
+      navigate('/game');
       setIsJoining(false);
     } else {
       alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
@@ -80,53 +57,86 @@ const HomeScreen = () => {
     }
   };
 
+  const handleResetGame = () => {
+    const confirmed = window.confirm('Vill du återställa spelet och börja om?');
+    if (confirmed) {
+      dispatch({ type: 'RESET_GAME' });
+      setPlayerName('');
+    }
+  };
+
+  // Show game over screen
+  if (gameOver) {
+    const winnerName = winner === 'player1' ? player1.name : player2.name;
+    return (
+      <div className="home-container">
+        <div className="header">
+          <h1>🎉 Spelet är slut!</h1>
+          <p>{winnerName} vann med 5 poäng!</p>
+        </div>
+
+        <div className="card">
+          <h2>Slutresultat</h2>
+          <div className="scores-display">
+            <div className="score-item">
+              <span className="player-name">{player1.name}</span>
+              <span className="score">{player1.score}</span>
+            </div>
+            <div className="score-item">
+              <span className="player-name">{player2.name}</span>
+              <span className="score">{player2.score}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <button className="btn btn-primary btn-large" onClick={handleResetGame}>
+            🔄 Spela igen
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="home-container">
       <div className="header">
         <h1>🎯 Hitta!</h1>
-        <p>Ta foto, dela, hitta!</p>
+        <p>Första till 5 poäng vinner!</p>
       </div>
 
+      {/* Show scores if players exist */}
+      {(player1.name || player2.name) && (
+        <div className="card">
+          <h2>Poäng</h2>
+          <div className="scores-display">
+            <div className="score-item">
+              <span className="player-name">{player1.name || 'Spelare 1'}</span>
+              <span className="score">{player1.score}</span>
+            </div>
+            <div className="score-item">
+              <span className="player-name">{player2.name || 'Spelare 2'}</span>
+              <span className="score">{player2.score}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
-        <h2>Spelare</h2>
+        <h2>Ditt namn</h2>
         <input
           className="input"
           type="text"
           placeholder="Ange ditt namn"
           value={playerName}
           onChange={(e) => setPlayerName(e.target.value)}
-          disabled={!!currentPlayer}
         />
-        {!currentPlayer && (
-          <button className="btn btn-primary" onClick={handleSetPlayer}>
-            Sätt spelare
-          </button>
-        )}
-        {currentPlayer && (
-          <p style={{ color: '#4CAF50', fontWeight: 'bold' }}>
-            Spelare: {currentPlayer}
-          </p>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Poäng</h2>
-        <div className="scores-display">
-          <div className="score-item">
-            <span className="player-name">{player1.name || 'Spelare 1'}</span>
-            <span className="score">{player1.score}</span>
-          </div>
-          <div className="score-item">
-            <span className="player-name">{player2.name || 'Spelare 2'}</span>
-            <span className="score">{player2.score}</span>
-          </div>
-        </div>
       </div>
 
       {!hasGameLink ? (
         <div className="card">
-          <h2>Spela</h2>
-          <p>Starta ett nytt spel och dela med en kompis!</p>
+          <h2>Starta spel</h2>
+          <p>Ta ett foto på ett objekt och dela med en kompis!</p>
           <button className="btn btn-primary btn-large" onClick={handleStartNewGame}>
             📸 Starta nytt spel
           </button>
@@ -134,31 +144,37 @@ const HomeScreen = () => {
       ) : (
         <div className="card">
           <h2>Gå med i spel</h2>
-          <p>Du har fått en spellänk! Ange ditt namn för att gå med i spelet.</p>
-          
+          <p>Du har fått en spellänk!</p>
           <button className="btn btn-primary btn-large" onClick={handleJoinGame} disabled={isJoining}>
             {isJoining ? 'Ansluter…' : '🎮 Gå med i spel'}
           </button>
         </div>
       )}
 
+      {(player1.name || player2.name) && (
+        <div className="card">
+          <button className="btn btn-secondary" onClick={handleResetGame}>
+            🔄 Återställ spel
+          </button>
+        </div>
+      )}
+
       <div className="card">
-        <h2>Så här spelar du:</h2>
+        <h2>Så spelar du:</h2>
         {!hasGameLink ? (
           <ol style={{ lineHeight: '1.6', color: '#666' }}>
-            <li>Ta ett foto på ett objekt</li>
-            <li>Objektet identifieras automatiskt</li>
-            <li>Dela spelet via länk till en kompis</li>
+            <li>Ta foto på ett objekt</li>
+            <li>Välj objekt om flera hittas</li>
+            <li>Dela spelet med en kompis</li>
             <li>Kompisen har 2 minuter att hitta samma typ av objekt</li>
-            <li>Få poäng för varje objekt du hittar!</li>
+            <li>Första till 5 poäng vinner!</li>
           </ol>
         ) : (
           <ol style={{ lineHeight: '1.6', color: '#666' }}>
-            <li>Ange ditt namn</li>
-            <li>Klicka "Gå med i spel"</li>
+            <li>Ange ditt namn och gå med</li>
             <li>Du har 2 minuter att hitta objektet</li>
-            <li>Ta foto när du hittat det rätta objektet</li>
-            <li>Få poäng om du hittar rätt!</li>
+            <li>Ta foto när du hittat det</li>
+            <li>Första till 5 poäng vinner!</li>
           </ol>
         )}
       </div>
