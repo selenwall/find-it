@@ -1,1 +1,1118 @@
-<!doctype html><html lang="sv"><head><meta charset="utf-8"/><link rel="icon" href="/find-it/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#4CAF50"/><meta name="description" content="Hitta! - Ett webbspel där spelare tar foton och delar objekt"/><link rel="apple-touch-icon" href="/find-it/logo192.png"/><link rel="manifest" href="/find-it/manifest.json"/><title>Hitta! 🎯</title><script defer="defer" src="/find-it/static/js/main.de97fd42.js"></script><link href="/find-it/static/css/main.14eca977.css" rel="stylesheet"></head><body><noscript>Du behöver aktivera JavaScript för att köra denna app.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4CAF50">
+  <meta name="description" content="Hitta! - Foto objektjakt spel">
+  <title>🎯 Hitta!</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+    }
+
+    /* .hidden must come after any display-setting rules to win the cascade */
+    .screen { min-height: 100vh; background: #f5f5f5; }
+
+    /* ── Loading ── */
+    #loading-screen {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #4CAF50;
+      color: white;
+    }
+    .loading-full {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #4CAF50;
+      color: white;
+    }
+    .spinner {
+      width: 50px; height: 50px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.7; } }
+
+    /* ── Layout helpers ── */
+    .hidden { display: none; }
+
+    .header {
+      background: #4CAF50;
+      color: white;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .header h1 { font-size: 2.5rem; font-weight: bold; }
+    .header p  { margin-top: .5rem; font-size: 1.1rem; opacity: .9; }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.1);
+      margin: 1rem;
+      padding: 1.5rem;
+    }
+    .card h2 { margin-bottom: 1rem; color: #333; font-size: 1.3rem; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: all .3s;
+      display: inline-block;
+      text-align: center;
+    }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-primary   { background: #4CAF50; color: white; }
+    .btn-primary:not(:disabled):hover   { background: #45a049; transform: translateY(-2px); }
+    .btn-secondary { background: #2196F3; color: white; }
+    .btn-secondary:not(:disabled):hover { background: #1976D2; transform: translateY(-2px); }
+    .btn-success   { background: #4CAF50; color: white; }
+    .btn-success:not(:disabled):hover   { background: #45a049; }
+    .btn-danger    { background: #FF5722; color: white; }
+    .btn-danger:not(:disabled):hover    { background: #E64A19; transform: translateY(-2px); }
+    .btn-large { padding: 15px 30px; font-size: 1.1rem; width: 100%; margin-bottom: 10px; }
+    .btn-row   { display: flex; gap: 10px; justify-content: center; }
+
+    /* ── Input ── */
+    .input {
+      width: 100%; padding: 12px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 1rem; margin-bottom: 10px; outline: none;
+    }
+    .input:focus { border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76,175,80,.2); }
+
+    /* ── Scores ── */
+    .scores-display {
+      display: flex; justify-content: space-around;
+      background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 10px 0;
+    }
+    .score-item   { display: flex; flex-direction: column; align-items: center; }
+    .player-lbl   { font-weight: bold; color: #666; margin-bottom: 5px; font-size: .9rem; }
+    .score-val    { font-size: 1.5rem; font-weight: bold; color: #4CAF50; }
+
+    /* ── Camera ── */
+    .camera-wrap {
+      position: relative; width: 100%; max-width: 500px;
+      margin: 0 auto; background: black;
+      border-radius: 10px; overflow: hidden;
+    }
+    .camera-video  { width: 100%; height: auto; display: block; min-height: 200px; }
+    .cam-overlay {
+      position: absolute; top:0; left:0; right:0; bottom:0;
+      display: flex; flex-direction: column; justify-content: space-between;
+      pointer-events: none;
+    }
+    .cam-top {
+      background: rgba(0,0,0,.7); color: white;
+      padding: 20px; text-align: center;
+    }
+    .cam-bottom {
+      background: rgba(0,0,0,.7); padding: 30px;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .capture-btn {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: white; border: 4px solid #4CAF50;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; pointer-events: all; transition: transform .2s;
+    }
+    .capture-btn:not(:disabled):hover { transform: scale(1.1); }
+    .capture-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .capture-inner {
+      width: 60px; height: 60px; border-radius: 50%; background: #4CAF50;
+    }
+    .timer-badge {
+      background: rgba(255,0,0,.8); color: white;
+      padding: 10px 20px; border-radius: 20px;
+      font-size: 1.5rem; font-weight: bold;
+      display: inline-block; margin-bottom: 10px;
+    }
+    .cam-status { color: #4CAF50; font-weight: bold; animation: pulse 2s infinite; }
+    .game-info-bar {
+      background: rgba(0,0,0,.8); color: white;
+      padding: 15px; border-radius: 10px; margin: 10px 20px; text-align: center;
+    }
+
+    /* ── Object selector overlay ── */
+    .modal-overlay {
+      position: fixed; top:0; left:0; right:0; bottom:0;
+      background: rgba(0,0,0,.8);
+      display: flex; justify-content: center; align-items: center; z-index: 1000;
+    }
+    .obj-selector {
+      background: white; border-radius: 15px; padding: 25px;
+      max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,.3);
+    }
+    .obj-selector h3 { margin-bottom: 20px; color: #333; text-align: center; font-size: 1.3rem; }
+    .obj-list { margin-bottom: 15px; }
+    .obj-option {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 15px; margin-bottom: 10px; background: #f8f9fa;
+      border-radius: 10px; cursor: pointer; transition: all .2s;
+      border: 2px solid transparent;
+    }
+    .obj-option:hover { background: #e9ecef; border-color: #4CAF50; transform: translateY(-2px); }
+    .obj-info   { display: flex; flex-direction: column; flex: 1; }
+    .obj-name   { font-size: 1.1rem; font-weight: bold; color: #333; margin-bottom: 4px; text-transform: capitalize; }
+    .obj-conf   { font-size: .9rem; color: #666; }
+    .obj-arrow  { font-size: 1.5rem; color: #4CAF50; font-weight: bold; }
+    .obj-actions { display: flex; justify-content: center; }
+
+    /* ── Waiting screen ── */
+    .waiting-wrap {
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px; min-height: 100vh;
+    }
+    .waiting-box {
+      background: white; border-radius: 15px; padding: 30px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      text-align: center; max-width: 500px; width: 100%;
+    }
+    .waiting-box h1 { color: #333; margin-bottom: 20px; font-size: 2rem; }
+    .info-box  { background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 20px 0; }
+    .info-box h2 { color: #4CAF50; margin-bottom: 10px; }
+    .target-badge {
+      font-size: 1.5rem; font-weight: bold; color: #333;
+      background: #e8f5e8; padding: 10px; border-radius: 8px; margin: 10px 0;
+    }
+    .msg-box { background: #e3f2fd; border-radius: 10px; padding: 15px; margin: 20px 0; }
+    .msg-box p { margin: 5px 0; color: #1976d2; }
+    .action-btns { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+    .instr-box {
+      background: #fff3e0; border-radius: 10px;
+      padding: 15px; margin-top: 20px; text-align: left;
+    }
+    .instr-box h3 { color: #f57c00; margin-bottom: 10px; text-align: center; }
+    .instr-box ol { color: #666; line-height: 1.6; padding-left: 20px; }
+    .instr-box li { margin-bottom: 5px; }
+
+    /* ── Score screen ── */
+    .score-big { text-align: center; font-size: 3rem; font-weight: bold; color: #4CAF50; margin: 1rem 0; }
+    .lb-item {
+      display: flex; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .lb-item.me { background: #E8F5E8; border-radius: 8px; padding: 12px 8px; margin: 2px 0; }
+    .ach-item { display: flex; align-items: center; padding: 8px 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .header h1 { font-size: 2rem; }
+      .card { margin: .5rem; padding: 1rem; }
+      .btn-large { padding: 12px 24px; font-size: 1rem; }
+      .obj-selector { margin: 20px; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ LOADING ═══════════════════════════ -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p id="loading-text">Laddar TensorFlow...</p>
+</div>
+
+<!-- ═══════════════════════════ HOME ═══════════════════════════ -->
+<div id="home-screen" class="screen hidden">
+  <div class="header">
+    <h1>🎯 Hitta!</h1>
+    <p>Ta foto, dela, hitta!</p>
+  </div>
+
+  <div class="card">
+    <h2>Spelare</h2>
+    <input id="home-name-input" class="input" type="text" placeholder="Ange ditt namn">
+    <div id="home-set-section">
+      <button class="btn btn-primary" onclick="App.setPlayer()">Sätt spelare</button>
+    </div>
+    <p id="home-player-msg" class="hidden" style="color:#4CAF50;font-weight:bold;margin-top:8px;"></p>
+  </div>
+
+  <div class="card">
+    <h2>Poäng</h2>
+    <div class="scores-display">
+      <div class="score-item">
+        <span class="player-lbl" id="home-p1-name">Spelare 1</span>
+        <span class="score-val"  id="home-p1-score">0</span>
+      </div>
+      <div class="score-item">
+        <span class="player-lbl" id="home-p2-name">Spelare 2</span>
+        <span class="score-val"  id="home-p2-score">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="home-new-card" class="card">
+    <h2>Spela</h2>
+    <p style="color:#666;margin-bottom:1rem;">Starta ett nytt spel och dela med en kompis!</p>
+    <button class="btn btn-primary btn-large" onclick="App.startNewGame()">📸 Starta nytt spel</button>
+  </div>
+
+  <div id="home-join-card" class="card hidden">
+    <h2>Gå med i spel</h2>
+    <p style="color:#666;margin-bottom:1rem;">Du har fått en spellänk! Ange ditt namn för att gå med i spelet.</p>
+    <button id="join-btn" class="btn btn-primary btn-large" onclick="App.joinGame()">🎮 Gå med i spel</button>
+  </div>
+
+  <div id="home-instr-new" class="card">
+    <h2>Så här spelar du:</h2>
+    <ol style="line-height:1.6;color:#666;padding-left:20px;">
+      <li>Ta ett foto på ett objekt</li>
+      <li>Objektet identifieras automatiskt</li>
+      <li>Dela spelet via länk till en kompis</li>
+      <li>Kompisen har 2 minuter att hitta samma typ av objekt</li>
+      <li>Få poäng för varje objekt du hittar!</li>
+    </ol>
+  </div>
+
+  <div id="home-instr-join" class="card hidden">
+    <h2>Så här spelar du:</h2>
+    <ol style="line-height:1.6;color:#666;padding-left:20px;">
+      <li>Ange ditt namn</li>
+      <li>Klicka "Gå med i spel"</li>
+      <li>Du har 2 minuter att hitta objektet</li>
+      <li>Ta foto när du hittat det rätta objektet</li>
+      <li>Få poäng om du hittar rätt!</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ CAMERA ═══════════════════════════ -->
+<div id="camera-screen" class="screen hidden">
+  <div id="cam-loading" class="loading-full hidden">
+    <div class="spinner"></div>
+    <p>Laddar AI-modell...</p>
+    <p style="font-size:14px;opacity:.7;">Detta kan ta några sekunder första gången</p>
+  </div>
+  <div id="cam-processing" class="loading-full hidden">
+    <div class="spinner"></div>
+    <p>Analyserar foto med AI...</p>
+  </div>
+  <div id="cam-main">
+    <div class="camera-wrap">
+      <video id="cam-video" class="camera-video" autoplay playsinline muted></video>
+      <canvas id="cam-canvas" class="hidden"></canvas>
+      <div class="cam-overlay">
+        <div class="cam-top"><p>Rikta kameran mot ett objekt</p></div>
+        <div class="cam-bottom">
+          <button id="cam-capture-btn" class="capture-btn" onclick="App.takeCameraPicture()">
+            <div class="capture-inner"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Object selector modal -->
+  <div id="cam-modal" class="modal-overlay hidden">
+    <div class="obj-selector">
+      <h3>Välj objekt att skicka:</h3>
+      <div id="cam-obj-list" class="obj-list"></div>
+      <div class="obj-actions">
+        <button class="btn btn-secondary" onclick="App.cancelCamSelection()">Avbryt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ GAME ═══════════════════════════ -->
+<div id="game-screen" class="screen hidden">
+  <!-- Game over -->
+  <div id="game-over-view" class="hidden">
+    <div class="card" style="text-align:center;margin:2rem;">
+      <h1 style="margin-bottom:1rem;">🎉 Spelet är slut!</h1>
+      <h2 id="game-winner-msg" style="margin-bottom:1.5rem;"></h2>
+      <div class="scores-display" style="margin-bottom:1.5rem;">
+        <div class="score-item">
+          <span class="player-lbl" id="go-p1-name">Spelare 1</span>
+          <span class="score-val"  id="go-p1-score">0</span>
+        </div>
+        <div class="score-item">
+          <span class="player-lbl" id="go-p2-name">Spelare 2</span>
+          <span class="score-val"  id="go-p2-score">0</span>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-large" onclick="App.goTo('home')">Tillbaka till start</button>
+    </div>
+  </div>
+  <!-- No active game -->
+  <div id="game-inactive-view" class="hidden">
+    <div class="card" style="text-align:center;margin:2rem;">
+      <h2 style="margin-bottom:1rem;">Inget aktivt spel</h2>
+      <button class="btn btn-primary" onclick="App.goTo('home')">Tillbaka till start</button>
+    </div>
+  </div>
+  <!-- Active game -->
+  <div id="game-active-view">
+    <div class="camera-wrap">
+      <video id="game-video" class="camera-video" autoplay playsinline muted></video>
+      <canvas id="game-canvas" class="hidden"></canvas>
+      <div class="cam-overlay">
+        <div class="cam-top">
+          <div class="timer-badge" id="game-timer">2:00</div>
+          <p><strong>Hitta en: <span id="game-target">Objekt</span></strong></p>
+          <div class="scores-display" style="background:rgba(255,255,255,.1);margin:8px 0 0 0;">
+            <div class="score-item">
+              <span class="player-lbl" style="color:rgba(255,255,255,.8)" id="game-p1-name">Spelare 1</span>
+              <span class="score-val" id="game-p1-score">0</span>
+            </div>
+            <div class="score-item">
+              <span class="player-lbl" style="color:rgba(255,255,255,.8)" id="game-p2-name">Spelare 2</span>
+              <span class="score-val" id="game-p2-score">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="cam-bottom">
+          <button id="game-capture-btn" class="capture-btn" onclick="App.takeGamePicture()">
+            <div class="capture-inner"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="game-status" class="game-info-bar">
+      <p>Ta foto när du hittat objektet!</p>
+    </div>
+  </div>
+  <!-- Object selector modal -->
+  <div id="game-modal" class="modal-overlay hidden">
+    <div class="obj-selector">
+      <h3>Välj objekt att kontrollera:</h3>
+      <div id="game-obj-list" class="obj-list"></div>
+      <div class="obj-actions">
+        <button class="btn btn-secondary" onclick="App.cancelGameSelection()">Avbryt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ WAITING ═══════════════════════════ -->
+<div id="waiting-screen" class="screen hidden">
+  <div class="waiting-wrap">
+    <div class="waiting-box">
+      <h1>⏳ Väntar på motspelare</h1>
+      <div class="info-box">
+        <h2>🎯 Ditt mål:</h2>
+        <div class="target-badge" id="waiting-target">-</div>
+      </div>
+      <div class="scores-display">
+        <div class="score-item">
+          <span class="player-lbl" id="wait-p1-name">Spelare 1</span>
+          <span class="score-val"  id="wait-p1-score">0</span>
+        </div>
+        <div class="score-item">
+          <span class="player-lbl" id="wait-p2-name">Spelare 2</span>
+          <span class="score-val"  id="wait-p2-score">0</span>
+        </div>
+      </div>
+      <div class="msg-box">
+        <p>📱 Dela spelet med din kompis via SMS eller meddelanden</p>
+        <p>⏰ Motspelaren har 2 minuter på sig att hitta objektet</p>
+      </div>
+      <div class="action-btns">
+        <button class="btn btn-secondary btn-large" onclick="App.shareAgain()">📱 Dela spelet igen</button>
+        <button class="btn btn-success btn-large"   onclick="App.opponentFound()">🎉 Motspelaren hittade objektet!</button>
+        <button class="btn btn-danger btn-large"    onclick="App.cancelWaiting()">❌ Avbryt väntan</button>
+      </div>
+      <div class="instr-box">
+        <h3>📋 Instruktioner:</h3>
+        <ol>
+          <li>Dela spelet med din kompis (du kan dela igen om det behövs)</li>
+          <li>Vänta tills de hittar objektet</li>
+          <li>När de hittar det, klicka "Motspelaren hittade objektet!"</li>
+          <li>Nu är det din tur att hitta något!</li>
+          <li><strong>Du kan inte avbryta väntan förrän motspelaren har hittat objektet</strong></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ SCORE ═══════════════════════════ -->
+<div id="score-screen" class="screen hidden">
+  <div class="header"><h1>Poäng &amp; Topplista</h1></div>
+  <div class="card">
+    <h2>Din poäng</h2>
+    <div class="score-big" id="my-score-display">0</div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="App.shareMyScore()">📤 Dela poäng</button>
+      <button class="btn btn-danger"    onclick="App.resetScore()">🔄 Återställ</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Topplista</h2>
+    <div id="leaderboard"></div>
+  </div>
+  <div class="card">
+    <h2>Framsteg</h2>
+    <div id="achievements"></div>
+  </div>
+  <div class="card">
+    <button class="btn btn-primary btn-large" onclick="App.goTo('home')">🏠 Tillbaka till start</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ================================================================
+   STATE
+   ================================================================ */
+const state = {
+  currentPlayer: null,
+  player1: { name: null, score: 0 },
+  player2: { name: null, score: 0 },
+  score: 0,
+  isGameActive: false,
+  targetObject: null,
+  gameState: 'idle',
+  waitingForOpponent: false,
+  isPlayer1: true,
+  winner: null,
+  gameOver: false,
+  opponentScore: 0,
+};
+
+/* ================================================================
+   RUNTIME
+   ================================================================ */
+let cameraStream   = null;
+let gameStream     = null;
+let gameTimer      = null;
+let timeLeft       = 120;
+let cocoModel      = null;
+let modelReady     = false;
+let busy           = false;
+let pendingObjs    = [];
+let pendingLink    = null;   // parsed incoming game link
+
+/* ================================================================
+   PERSISTENCE
+   ================================================================ */
+function persist() {
+  try {
+    localStorage.setItem('hitta', JSON.stringify({
+      currentPlayer: state.currentPlayer,
+      score: state.score,
+    }));
+  } catch (_) {}
+}
+
+function hydrate() {
+  try {
+    const d = JSON.parse(localStorage.getItem('hitta') || '{}');
+    if (d.currentPlayer) state.currentPlayer = d.currentPlayer;
+    if (d.score)         state.score         = d.score;
+  } catch (_) {}
+}
+
+/* ================================================================
+   OBJECT DETECTION
+   ================================================================ */
+async function ensureModel() {
+  if (modelReady) return;
+  try {
+    cocoModel = await cocoSsd.load();
+  } catch (e) {
+    console.warn('COCO-SSD load failed, using fallback:', e);
+    cocoModel = null;
+  }
+  modelReady = true;
+}
+
+function fallback() {
+  const classes = ['person','car','bottle','book','cell phone','chair','cup','laptop','dog','cat'];
+  return { objectClass: classes[Math.floor(Math.random() * classes.length)], confidence: 0.85, bbox: [0,0,1,1] };
+}
+
+async function detect(imgEl) {
+  await ensureModel();
+  if (!cocoModel) return [fallback()];
+  try {
+    const preds = await cocoModel.detect(imgEl);
+    const valid = preds
+      .filter(p => p.score > 0.3)
+      .sort((a, b) => b.score - a.score)
+      .map(p => ({ objectClass: p.class, confidence: p.score, bbox: p.bbox }));
+    return valid.length ? valid : [fallback()];
+  } catch (e) {
+    console.error('Detection error:', e);
+    return [fallback()];
+  }
+}
+
+function similarity(a, b) {
+  if (a.objectClass === b.objectClass) return 0.95;
+  const cats = [
+    ['car','truck','bus','motorcycle','bicycle','train','boat','airplane'],
+    ['bottle','cup','bowl','wine glass','mug'],
+    ['chair','couch','bed','dining table','toilet','tv','laptop'],
+    ['apple','banana','sandwich','pizza','donut','cake','orange','broccoli'],
+    ['cell phone','laptop','mouse','remote','keyboard','tv'],
+    ['backpack','handbag','tie','suitcase'],
+    ['bird','cat','dog','horse','sheep','cow','elephant','bear','zebra','giraffe'],
+  ];
+  for (const cat of cats) {
+    if (cat.includes(a.objectClass) && cat.includes(b.objectClass)) return 0.7;
+  }
+  const x = a.objectClass.toLowerCase(), y = b.objectClass.toLowerCase();
+  if (x.includes(y) || y.includes(x)) return 0.6;
+  return 0.1;
+}
+
+function isMatch(target, found) {
+  if (!target || !found) return false;
+  if (target.confidence < 0.5 || found.confidence < 0.5) return false;
+  return similarity(target, found) > 0.6;
+}
+
+/* ================================================================
+   CAMERA HELPERS
+   ================================================================ */
+async function startCam(videoEl) {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    videoEl.srcObject = s;
+    return s;
+  } catch (e) {
+    alert('Kunde inte komma åt kameran. Kontrollera behörigheter.');
+    return null;
+  }
+}
+
+function killStream(s) {
+  if (s) s.getTracks().forEach(t => t.stop());
+}
+
+async function captureBlob(videoEl, canvasEl) {
+  canvasEl.width  = videoEl.videoWidth  || 640;
+  canvasEl.height = videoEl.videoHeight || 480;
+  canvasEl.getContext('2d').drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+  return new Promise(res => canvasEl.toBlob(res, 'image/jpeg', 0.8));
+}
+
+/* ================================================================
+   SHARING
+   ================================================================ */
+async function doShare(targetObj) {
+  const gd = JSON.stringify({
+    obj:     targetObj.objectClass,
+    player1: state.player1.name || state.currentPlayer || 'Spelare 1',
+    player2: state.player2.name || 'Spelare 2',
+  });
+  const base     = window.location.origin + window.location.pathname;
+  const shareUrl = `${base}#/?game=${encodeURIComponent(gd)}`;
+  const msg      = `🎯 Hitta! - ${state.currentPlayer} utmanar dig!\n\nHitta en ${targetObj.objectClass}!\n\nDu har 2 minuter på dig!\n\nSpela här: ${shareUrl}`;
+
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Hitta! - Spelutmaning', text: msg, url: shareUrl }); return true; }
+    catch (_) {}
+  }
+  try {
+    await navigator.clipboard.writeText(msg);
+    alert('Spellänk kopierad till urklipp! Dela den med din kompis via SMS eller meddelanden.');
+    return true;
+  } catch (_) {}
+  // Last resort: textarea copy
+  const ta = Object.assign(document.createElement('textarea'), { value: shareUrl });
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  alert('Länk kopierad: ' + shareUrl);
+  return true;
+}
+
+async function doShareScore() {
+  const msg = `🎉 ${state.currentPlayer} har ${state.score} poäng i Hitta! 🏆`;
+  if (navigator.share) { try { await navigator.share({ title: 'Hitta!', text: msg }); return; } catch (_) {} }
+  try { await navigator.clipboard.writeText(msg); alert('Poäng kopierad!'); } catch (_) { alert(msg); }
+}
+
+function parseLink(url) {
+  try {
+    const u = new URL(url);
+    let gp = u.searchParams.get('game');
+    if (!gp && u.hash) {
+      const h = u.hash.startsWith('#') ? u.hash.slice(1) : u.hash;
+      const qi = h.indexOf('?');
+      if (qi !== -1) gp = new URLSearchParams(h.slice(qi + 1)).get('game');
+    }
+    if (gp) {
+      const d = JSON.parse(decodeURIComponent(gp));
+      if (d.obj) return {
+        targetObject: { objectClass: d.obj, confidence: 0.9 },
+        player1Name:  d.player1 || 'Spelare 1',
+        player2Name:  d.player2 || 'Spelare 2',
+      };
+    }
+  } catch (_) {}
+  return null;
+}
+
+/* ================================================================
+   ROUTER
+   ================================================================ */
+const App = {
+
+  goTo(screen) {
+    // Tear down previous screen
+    if (screen !== 'camera') { killStream(cameraStream); cameraStream = null; }
+    if (screen !== 'game')   { killStream(gameStream);   gameStream   = null; }
+    clearInterval(gameTimer); gameTimer = null;
+
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById(screen + '-screen').classList.remove('hidden');
+
+    if (screen === 'home')    this._initHome();
+    if (screen === 'camera')  this._initCamera();
+    if (screen === 'game')    this._initGame();
+    if (screen === 'waiting') this._initWaiting();
+    if (screen === 'score')   this._initScore();
+  },
+
+  /* ── HOME ── */
+  _initHome() {
+    pendingLink = parseLink(window.location.href);
+    const nameEl   = document.getElementById('home-name-input');
+    const setEl    = document.getElementById('home-set-section');
+    const msgEl    = document.getElementById('home-player-msg');
+    const newCard  = document.getElementById('home-new-card');
+    const joinCard = document.getElementById('home-join-card');
+    const instrNew = document.getElementById('home-instr-new');
+    const instrJoin= document.getElementById('home-instr-join');
+
+    if (state.currentPlayer) {
+      nameEl.value    = state.currentPlayer;
+      nameEl.disabled = true;
+      setEl.classList.add('hidden');
+      msgEl.classList.remove('hidden');
+      msgEl.textContent = `Spelare: ${state.currentPlayer}`;
+    } else {
+      nameEl.disabled = false;
+      setEl.classList.remove('hidden');
+      msgEl.classList.add('hidden');
+    }
+
+    const hasLink = !!pendingLink;
+    newCard.classList.toggle('hidden', hasLink);
+    joinCard.classList.toggle('hidden', !hasLink);
+    instrNew.classList.toggle('hidden', hasLink);
+    instrJoin.classList.toggle('hidden', !hasLink);
+
+    document.getElementById('home-p1-name').textContent  = state.player1.name  || 'Spelare 1';
+    document.getElementById('home-p1-score').textContent = state.player1.score;
+    document.getElementById('home-p2-name').textContent  = state.player2.name  || 'Spelare 2';
+    document.getElementById('home-p2-score').textContent = state.player2.score;
+  },
+
+  setPlayer() {
+    const name = document.getElementById('home-name-input').value.trim();
+    if (!name) { alert('Ange ett namn'); return; }
+    state.currentPlayer = name;
+    persist();
+    document.getElementById('home-name-input').disabled = true;
+    document.getElementById('home-set-section').classList.add('hidden');
+    const msg = document.getElementById('home-player-msg');
+    msg.classList.remove('hidden');
+    msg.textContent = `Spelare: ${name}`;
+    alert(`Välkommen ${name}!`);
+  },
+
+  startNewGame() {
+    const name = state.currentPlayer || document.getElementById('home-name-input').value.trim();
+    if (!name) { alert('Ange ditt namn först'); return; }
+    if (!state.currentPlayer) { state.currentPlayer = name; persist(); }
+    state.player1   = { name, score: state.player1.score };
+    state.isPlayer1 = true;
+    this.goTo('camera');
+  },
+
+  joinGame() {
+    const btn = document.getElementById('join-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Ansluter…';
+    const name = state.currentPlayer || document.getElementById('home-name-input').value.trim();
+    if (!name) {
+      alert('Ange ditt namn först');
+      btn.disabled = false; btn.textContent = '🎮 Gå med i spel'; return;
+    }
+    if (!state.currentPlayer) { state.currentPlayer = name; persist(); }
+    if (!pendingLink) {
+      alert('Inget aktivt spel att gå med i. Kontrollera att du har en giltig spellänk.');
+      btn.disabled = false; btn.textContent = '🎮 Gå med i spel'; return;
+    }
+    state.player2       = { name, score: state.player2.score };
+    state.player1       = { name: pendingLink.player1Name, score: state.player1.score };
+    state.isPlayer1     = false;
+    state.targetObject  = pendingLink.targetObject;
+    state.isGameActive  = true;
+    state.gameState     = 'playing';
+    this.goTo('game');
+  },
+
+  /* ── CAMERA ── */
+  _initCamera() {
+    this._camView('main');
+    const v = document.getElementById('cam-video');
+    startCam(v).then(s => { cameraStream = s; });
+  },
+
+  _camView(which) {
+    document.getElementById('cam-loading').classList.add('hidden');
+    document.getElementById('cam-processing').classList.add('hidden');
+    document.getElementById('cam-main').classList.remove('hidden');
+    if (which === 'loading')    { document.getElementById('cam-loading').classList.remove('hidden');    document.getElementById('cam-main').classList.add('hidden'); }
+    if (which === 'processing') { document.getElementById('cam-processing').classList.remove('hidden'); document.getElementById('cam-main').classList.add('hidden'); }
+  },
+
+  async takeCameraPicture() {
+    if (busy) return;
+    const video  = document.getElementById('cam-video');
+    const canvas = document.getElementById('cam-canvas');
+    if (!video.srcObject) { alert('Kameran är inte aktiv.'); return; }
+
+    busy = true;
+    document.getElementById('cam-capture-btn').disabled = true;
+    this._camView('processing');
+
+    try {
+      const blob = await captureBlob(video, canvas);
+      const img  = new Image();
+      const url  = URL.createObjectURL(blob);
+      img.src = url;
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+      const dets = await detect(img);
+      URL.revokeObjectURL(url);
+
+      this._camView('main');
+      if (dets.length === 1) {
+        const d  = dets[0];
+        const ok = confirm(`Jag hittade en ${d.objectClass} (${Math.round(d.confidence * 100)}% säker). Vill du dela spelet?`);
+        if (ok) await this._doShareGame(d);
+      } else {
+        this._showCamModal(dets);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Kunde inte ta foto');
+      this._camView('main');
+    } finally {
+      busy = false;
+      document.getElementById('cam-capture-btn').disabled = false;
+    }
+  },
+
+  _showCamModal(dets) {
+    pendingObjs = dets;
+    document.getElementById('cam-obj-list').innerHTML = dets.map((d, i) => `
+      <div class="obj-option" onclick="App._pickCamObj(${i})">
+        <div class="obj-info">
+          <span class="obj-name">${d.objectClass}</span>
+          <span class="obj-conf">${Math.round(d.confidence * 100)}% säker</span>
+        </div>
+        <div class="obj-arrow">→</div>
+      </div>`).join('');
+    document.getElementById('cam-modal').classList.remove('hidden');
+  },
+
+  async _pickCamObj(i) {
+    const d = pendingObjs[i];
+    document.getElementById('cam-modal').classList.add('hidden');
+    const ok = confirm(`Du valde: ${d.objectClass} (${Math.round(d.confidence * 100)}% säker). Vill du dela spelet?`);
+    if (ok) await this._doShareGame(d);
+  },
+
+  cancelCamSelection() {
+    document.getElementById('cam-modal').classList.add('hidden');
+    pendingObjs = [];
+  },
+
+  async _doShareGame(obj) {
+    state.targetObject     = obj;
+    state.waitingForOpponent = true;
+    state.gameState        = 'waiting_for_opponent';
+    state.isMyTurn         = false;
+    await doShare(obj);
+    this.goTo('waiting');
+  },
+
+  /* ── GAME ── */
+  _initGame() {
+    if (state.gameOver) {
+      this._gameView('over');
+      const w = state.winner === 'player1' ? state.player1.name : state.player2.name;
+      document.getElementById('game-winner-msg').textContent = `${w} vann!`;
+      document.getElementById('go-p1-name').textContent  = state.player1.name  || 'Spelare 1';
+      document.getElementById('go-p1-score').textContent = state.player1.score;
+      document.getElementById('go-p2-name').textContent  = state.player2.name  || 'Spelare 2';
+      document.getElementById('go-p2-score').textContent = state.player2.score;
+      return;
+    }
+    if (!state.isGameActive) { this._gameView('inactive'); return; }
+
+    this._gameView('active');
+    document.getElementById('game-target').textContent  = state.targetObject?.objectClass || 'Objekt';
+    document.getElementById('game-p1-name').textContent  = state.player1.name  || 'Spelare 1';
+    document.getElementById('game-p1-score').textContent = state.player1.score;
+    document.getElementById('game-p2-name').textContent  = state.player2.name  || 'Spelare 2';
+    document.getElementById('game-p2-score').textContent = state.player2.score;
+
+    timeLeft = 120;
+    this._updateTimer();
+    gameTimer = setInterval(() => {
+      timeLeft--;
+      this._updateTimer();
+      if (timeLeft <= 0) {
+        clearInterval(gameTimer); gameTimer = null;
+        this._timeout();
+      }
+    }, 1000);
+
+    const v = document.getElementById('game-video');
+    startCam(v).then(s => {
+      gameStream = s;
+      document.getElementById('game-status').innerHTML =
+        '<p>Ta foto när du hittat objektet!</p><p class="cam-status">📹 Kameran är igång</p>';
+    });
+  },
+
+  _gameView(which) {
+    document.getElementById('game-over-view').classList.add('hidden');
+    document.getElementById('game-inactive-view').classList.add('hidden');
+    document.getElementById('game-active-view').classList.add('hidden');
+    if (which === 'over')     document.getElementById('game-over-view').classList.remove('hidden');
+    if (which === 'inactive') document.getElementById('game-inactive-view').classList.remove('hidden');
+    if (which === 'active')   document.getElementById('game-active-view').classList.remove('hidden');
+  },
+
+  _updateTimer() {
+    const el = document.getElementById('game-timer');
+    if (!el) return;
+    const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+    el.textContent    = `${m}:${s.toString().padStart(2,'0')}`;
+    el.style.background = timeLeft <= 30 ? 'rgba(200,0,0,.9)' : 'rgba(255,0,0,.8)';
+  },
+
+  _timeout() {
+    killStream(gameStream); gameStream = null;
+    alert(`Tiden är ute! ⏰ Du hittade inte en ${state.targetObject?.objectClass || 'objektet'} i tid.`);
+    state.isGameActive = false;
+    state.gameState    = 'idle';
+    this.goTo('home');
+  },
+
+  async takeGamePicture() {
+    if (busy || !state.isGameActive) return;
+    const video  = document.getElementById('game-video');
+    const canvas = document.getElementById('game-canvas');
+    if (!video.srcObject) { alert('Kameran är inte aktiv.'); return; }
+
+    busy = true;
+    document.getElementById('game-capture-btn').disabled = true;
+    document.getElementById('game-status').innerHTML = '<p>Analyserar foto...</p>';
+
+    try {
+      const blob = await captureBlob(video, canvas);
+      const img  = new Image();
+      const url  = URL.createObjectURL(blob);
+      img.src = url;
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+      const dets = await detect(img);
+      URL.revokeObjectURL(url);
+
+      if (dets.length === 1) {
+        await this._checkMatch(dets[0]);
+      } else {
+        this._showGameModal(dets);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Kunde inte ta foto');
+    } finally {
+      busy = false;
+      document.getElementById('game-capture-btn').disabled = false;
+      document.getElementById('game-status').innerHTML = '<p>Ta foto när du hittat objektet!</p>';
+    }
+  },
+
+  async _checkMatch(det) {
+    if (isMatch(state.targetObject, det)) {
+      const ok = confirm(`Match! 🎯 Du hittade en ${det.objectClass}! Det matchar målet!`);
+      if (ok) this._winRound();
+    } else {
+      alert(`Inte rätt objekt. Du hittade en ${det.objectClass}, men du letar efter en ${state.targetObject.objectClass}.`);
+    }
+  },
+
+  _showGameModal(dets) {
+    pendingObjs = dets;
+    document.getElementById('game-obj-list').innerHTML = dets.map((d, i) => `
+      <div class="obj-option" onclick="App._pickGameObj(${i})">
+        <div class="obj-info">
+          <span class="obj-name">${d.objectClass}</span>
+          <span class="obj-conf">${Math.round(d.confidence * 100)}% säker</span>
+        </div>
+        <div class="obj-arrow">→</div>
+      </div>`).join('');
+    document.getElementById('game-modal').classList.remove('hidden');
+  },
+
+  async _pickGameObj(i) {
+    const d = pendingObjs[i];
+    document.getElementById('game-modal').classList.add('hidden');
+    pendingObjs = [];
+    await this._checkMatch(d);
+  },
+
+  cancelGameSelection() {
+    document.getElementById('game-modal').classList.add('hidden');
+    pendingObjs = [];
+  },
+
+  _winRound() {
+    clearInterval(gameTimer); gameTimer = null;
+    killStream(gameStream); gameStream = null;
+
+    state.score++;
+    if (state.isPlayer1) state.player1.score++;
+    else                 state.player2.score++;
+    persist();
+
+    const myScore = state.isPlayer1 ? state.player1.score : state.player2.score;
+    if (myScore >= 5) {
+      state.winner     = state.isPlayer1 ? 'player1' : 'player2';
+      state.gameOver   = true;
+      state.isGameActive = false;
+      alert(`🎉 Spelet är slut! ${state.currentPlayer} vann med ${myScore} poäng!`);
+      this.goTo('home');
+      return;
+    }
+
+    const share = confirm(
+      `Grattis! 🎉 Du hittade en ${state.targetObject.objectClass}! Du får 1 poäng! ` +
+      `Nu är det din tur att hitta något nytt. Vill du dela poängen?`
+    );
+    if (share) doShareScore();
+
+    state.isGameActive = false;
+    state.gameState    = 'idle';
+    this.goTo('camera');
+  },
+
+  /* ── WAITING ── */
+  _initWaiting() {
+    if (!state.waitingForOpponent) { this.goTo('home'); return; }
+    document.getElementById('waiting-target').textContent  = state.targetObject?.objectClass || '-';
+    document.getElementById('wait-p1-name').textContent    = state.player1.name  || 'Spelare 1';
+    document.getElementById('wait-p1-score').textContent   = state.player1.score;
+    document.getElementById('wait-p2-name').textContent    = state.player2.name  || 'Spelare 2';
+    document.getElementById('wait-p2-score').textContent   = state.player2.score;
+  },
+
+  async shareAgain() {
+    if (state.targetObject) await doShare(state.targetObject);
+  },
+
+  opponentFound() {
+    state.waitingForOpponent = false;
+    state.isMyTurn           = true;
+    state.opponentScore++;
+    this.goTo('camera');
+  },
+
+  cancelWaiting() {
+    if (!confirm('Är du säker på att du vill avbryta väntan?')) return;
+    state.isGameActive       = false;
+    state.gameState          = 'idle';
+    state.waitingForOpponent = false;
+    this.goTo('home');
+  },
+
+  /* ── SCORE ── */
+  _initScore() {
+    document.getElementById('my-score-display').textContent = state.score;
+
+    const rows = [
+      { name: 'Anna',  score: 15 },
+      { name: 'Erik',  score: 12 },
+      { name: 'Maria', score: 8  },
+      { name: state.currentPlayer || 'Du', score: state.score },
+      { name: 'Lars',  score: 5  },
+    ].sort((a, b) => b.score - a.score);
+
+    const medals = ['🥇','🥈','🥉'];
+    document.getElementById('leaderboard').innerHTML = rows.map((p, i) => {
+      const me = p.name === (state.currentPlayer || 'Du');
+      return `<div class="lb-item ${me ? 'me' : ''}">
+        <div style="display:flex;align-items:center;width:60px;">
+          <span style="font-size:20px;margin-right:5px;">${medals[i]||'🏆'}</span>
+          <span style="font-size:16px;font-weight:bold;color:#666;">${i+1}</span>
+        </div>
+        <span style="flex:1;font-size:16px;margin-left:10px;font-weight:${me?'bold':'normal'};color:${me?'#4CAF50':'#333'};">${p.name}</span>
+        <span style="font-size:18px;font-weight:bold;color:#4CAF50;">${p.score}</span>
+      </div>`;
+    }).join('');
+
+    const achs = [
+      { e:'🎯', label:'Första objektet',  n:1  },
+      { e:'🔥', label:'5 objekt hittade', n:5  },
+      { e:'💎', label:'10 objekt hittade',n:10 },
+      { e:'👑', label:'25 objekt hittade',n:25 },
+    ];
+    document.getElementById('achievements').innerHTML = achs.map(a =>
+      `<div class="ach-item">
+        <span style="font-size:24px;margin-right:15px;">${a.e}</span>
+        <span style="font-size:16px;flex:1;">${state.score >= a.n ? '✅' : '⏳'} ${a.label}</span>
+      </div>`
+    ).join('');
+  },
+
+  async shareMyScore() { await doShareScore(); },
+
+  resetScore() {
+    if (!confirm('Är du säker på att du vill återställa din poäng?')) return;
+    state.score = 0;
+    persist();
+    this._initScore();
+    alert('Din poäng har återställts');
+  },
+};
+
+/* ================================================================
+   BOOT
+   ================================================================ */
+(async function boot() {
+  hydrate();
+
+  document.getElementById('loading-text').textContent = 'Laddar TensorFlow...';
+  try { await tf.ready(); } catch (_) {}
+
+  // Show the app immediately — model loads lazily on first photo
+  document.getElementById('loading-screen').classList.add('hidden');
+  App.goTo('home');
+
+  // Kick off model download in the background so it's ready when needed
+  ensureModel().catch(e => console.warn('Background model load:', e));
+})();
+</script>
+</body>
+</html>
