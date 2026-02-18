@@ -1103,16 +1103,15 @@ const App = {
 (async function boot() {
   hydrate();
 
-  // TF ready
   document.getElementById('loading-text').textContent = 'Laddar TensorFlow...';
   try { await tf.ready(); } catch (_) {}
 
-  // Pre-load model in background (don't block UI)
-  document.getElementById('loading-text').textContent = 'Laddar AI-modell...';
-  try { await ensureModel(); } catch (_) {}
-
+  // Show the app immediately — model loads lazily on first photo
   document.getElementById('loading-screen').classList.add('hidden');
   App.goTo('home');
+
+  // Kick off model download in the background so it's ready when needed
+  ensureModel().catch(e => console.warn('Background model load:', e));
 })();
 </script>
 </body>
