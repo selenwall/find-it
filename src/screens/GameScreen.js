@@ -6,11 +6,9 @@ import SMSService from '../services/SMSService';
 
 const GameScreen = () => {
   const { 
-    currentGame, 
     targetObject, 
     timeLeft, 
     isGameActive, 
-    score,
     player1,
     player2,
     winner,
@@ -21,7 +19,6 @@ const GameScreen = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
   const [stream, setStream] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [localTimeLeft, setLocalTimeLeft] = useState(120);
@@ -43,15 +40,16 @@ const GameScreen = () => {
     
     initializeAI();
     
-    if (isGameActive && !gameStarted) {
-      startGame();
+    if (isGameActive) {
+      startTimer();
       startCamera();
     }
     
     return () => {
       stopCamera();
+      stopTimer();
     };
-  }, [isGameActive]);
+  }, []);
 
   useEffect(() => {
     if (localTimeLeft <= 0 && isGameActive) {
@@ -59,31 +57,8 @@ const GameScreen = () => {
     }
   }, [localTimeLeft]);
 
-  // Start camera when component mounts and game is active
-  useEffect(() => {
-    if (isGameActive && !isModelLoading) {
-      startCamera();
-    }
-  }, [isGameActive, isModelLoading]);
-
-  // Also start camera when component mounts (for navigation from other screens)
-  useEffect(() => {
-    if (!isModelLoading && isGameActive) {
-      // Small delay to ensure video element is ready
-      const timer = setTimeout(() => {
-        startCamera();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  const startGame = () => {
-    setGameStarted(true);
-    setLocalTimeLeft(120); // Reset timer to 2 minutes
-    startTimer();
-  };
-
   const startTimer = () => {
+    setLocalTimeLeft(120); // Reset timer to 2 minutes
     timerRef.current = setInterval(() => {
       setLocalTimeLeft(prev => {
         if (prev <= 1) {
@@ -134,38 +109,38 @@ const GameScreen = () => {
     if (found) {
       dispatch({ type: 'FOUND_OBJECT', payload: targetObject });
       
-      // Check if game is over (winner)
-      if (gameOver) {
-        const winnerName = winner === 'player1' ? player1.name : player2.name;
-        alert(`🎉 Spelet är slut! ${winnerName} vann med 5 poäng!`);
-        navigate('/home');
-        return;
-      }
-      
-      // Not game over - continue playing
       const shareConfirmed = window.confirm(
-        `Grattis! 🎉 Du hittade en ${targetObject.objectClass}! Du får 1 poäng! Nu är det din tur att hitta något nytt. Vill du dela poängen?`
+        `Grattis! 🎉 Du hittade en ${targetObject.objectClass}! Du får 1 poäng! Vill du dela poängen med motspelaren?`
       );
       
       if (shareConfirmed) {
         shareScore();
       }
       
-      // After finding object, it's now your turn to find something new
-      dispatch({ type: 'END_GAME' });
-      navigate('/camera');
+      // Navigate back to home (game continues or ends based on score)
+      navigate('/');
     } else {
       alert(
-        `Tiden är ute! ⏰ Du hittade inte en ${targetObject.objectClass} i tid. Bättre lycka nästa gång!`
+        `Tiden är ute! ⏰ Du hittade inte en ${targetObject.objectClass} i tid. 0 poäng denna runda.`
       );
       dispatch({ type: 'END_GAME' });
-      navigate('/home');
+      navigate('/');
     }
   };
 
   const shareScore = async () => {
     try {
-      await SMSService.shareScore(currentGame.playerName, score + 1, targetObject);
+      const currentPlayerName = player1.name || player2.name;
+      const newScore = (player1.name ? player1.score : player2.score) + 1;
+      await SMSService.shareScore(
+        currentPlayerName, 
+        newScore, 
+        targetObject,
+        player1.name,
+        player2.name,
+        player1.score,
+        player2.score
+      );
     } catch (error) {
       console.error('Error sharing score:', error);
     }
@@ -271,39 +246,12 @@ const GameScreen = () => {
     );
   }
 
-  if (gameOver) {
-    const winnerName = winner === 'player1' ? player1.name : player2.name;
-    return (
-      <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
-        <h1>🎉 Spelet är slut!</h1>
-        <h2>{winnerName} vann!</h2>
-        <div className="scores-display">
-          <div className="score-item">
-            <span className="player-name">{player1.name}</span>
-            <span className="score">{player1.score}</span>
-          </div>
-          <div className="score-item">
-            <span className="player-name">{player2.name}</span>
-            <span className="score">{player2.score}</span>
-          </div>
-        </div>
-        <button className="btn btn-primary" onClick={() => navigate('/')}>
-          Tillbaka till start
-        </button>
-      </div>
-    );
+  // Redirect to home if game is over or no active game
+  if (gameOver || !isGameActive || !targetObject) {
+    navigate('/');
+    return null;
   }
 
-  if (!isGameActive) {
-    return (
-      <div className="card" style={{ textAlign: 'center', margin: '2rem' }}>
-        <h2>Inget aktivt spel</h2>
-        <button className="btn btn-primary" onClick={() => navigate('/')}>
-          Tillbaka till start
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="game-screen">
@@ -319,7 +267,7 @@ const GameScreen = () => {
         
         <div className="camera-overlay">
           <div className="camera-top">
-            <div className="timer">
+            <div className="timer" style={{ fontSize: '24px', fontWeight: 'bold', color: localTimeLeft <= 30 ? 'red' : 'white' }}>
               {formatTime(localTimeLeft)}
             </div>
             <p><strong>Hitta en: {targetObject?.objectClass || 'Objekt'}</strong></p>
@@ -336,6 +284,9 @@ const GameScreen = () => {
           </div>
           
           <div className="camera-bottom">
+            <button className="btn btn-secondary" onClick={() => { stopCamera(); navigate('/'); }}>
+              ← Avbryt
+            </button>
             <button
               className={`capture-button ${(!isGameActive || isProcessing) ? 'disabled' : ''}`}
               onClick={takePicture}
@@ -384,12 +335,6 @@ const GameScreen = () => {
         </div>
       )}
 
-      <div className="game-info">
-        <p>{isProcessing ? 'Analyserar foto...' : 'Ta foto när du hittat objektet!'}</p>
-        {stream && (
-          <p className="camera-status">📹 Kameran är igång - leta efter objektet!</p>
-        )}
-      </div>
     </div>
   );
 };
