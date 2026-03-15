@@ -5,8 +5,6 @@ import * as tf from '@tensorflow/tfjs';
 import HomeScreen from './screens/HomeScreen';
 import CameraScreen from './screens/CameraScreen';
 import GameScreen from './screens/GameScreen';
-import ScoreScreen from './screens/ScoreScreen';
-import WaitingScreen from './screens/WaitingScreen';
 import { GameProvider } from './context/GameContext';
 import './App.css';
 
@@ -25,7 +23,7 @@ const App = () => {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Laddar TensorFlow...</p>
+        <p>Laddar...</p>
       </div>
     );
   }
@@ -38,8 +36,6 @@ const App = () => {
             <Route path="/" element={<HomeScreen />} />
             <Route path="/camera" element={<CameraScreen />} />
             <Route path="/game" element={<GameScreen />} />
-            <Route path="/waiting" element={<WaitingScreen />} />
-            <Route path="/score" element={<ScoreScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

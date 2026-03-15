@@ -5,243 +5,225 @@ import ObjectDetectionService from '../services/ObjectDetection';
 import SMSService from '../services/SMSService';
 
 const CameraScreen = () => {
-  const { currentPlayer, player1, player2, dispatch } = useGame();
+  const { 
+    currentPlayerName,
+    player1,
+    player2,
+    isMyTurn,
+    dispatch 
+  } = useGame();
+  
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  
   const [isProcessing, setIsProcessing] = useState(false);
-  const [detectedObject, setDetectedObject] = useState(null);
   const [detectedObjects, setDetectedObjects] = useState([]);
   const [showObjectSelector, setShowObjectSelector] = useState(false);
-  const [stream, setStream] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize object detection service
-    const initializeAI = async () => {
+    let mounted = true;
+
+    const initialize = async () => {
       try {
         await ObjectDetectionService.loadModel();
-        setIsModelLoading(false);
-        console.log('AI model ready');
+        if (mounted) {
+          setIsModelLoading(false);
+          await startCamera();
+        }
       } catch (error) {
-        console.error('Failed to load AI model:', error);
-        setIsModelLoading(false);
+        console.error('Failed to initialize:', error);
+        if (mounted) {
+          setIsModelLoading(false);
+        }
       }
     };
     
-    initializeAI();
-    startCamera();
+    initialize();
+    dispatch({ type: 'SET_CAMERA_ACTIVE', payload: true });
     
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      mounted = false;
+      stopCamera();
+      dispatch({ type: 'SET_CAMERA_ACTIVE', payload: false });
     };
-  }, []);
+  }, [dispatch]);
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       });
-      setStream(mediaStream);
+      
+      streamRef.current = stream;
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+        videoRef.current.srcObject = stream;
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Kunde inte komma åt kameran. Kontrollera behörigheter.');
+      console.error('Camera access error:', error);
+      alert('Kunde inte starta kameran. Kontrollera behörigheter.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
   const takePicture = async () => {
-    if (videoRef.current && canvasRef.current && !isProcessing) {
-      try {
-        setIsProcessing(true);
-        
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        
-        // Set canvas size to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Draw video frame to canvas
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Convert canvas to blob
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-        const imageUrl = URL.createObjectURL(blob);
-        
-        // Detect objects in the image
-        const detections = await ObjectDetectionService.detectObjects(imageUrl);
-        
-        if (Array.isArray(detections)) {
-          // Multiple objects detected
-          setDetectedObjects(detections);
-          setShowObjectSelector(true);
-        } else {
-          // Single object detected
-          setDetectedObject(detections);
-          setDetectedObjects([detections]);
-          
-          const confirmed = window.confirm(
-            `Jag hittade en ${detections.objectClass} (${Math.round(detections.confidence * 100)}% säker). Vill du dela spelet?`
-          );
-          
-          if (confirmed) {
-            await shareGame(detections);
-          } else {
-            setDetectedObject(null);
-            setDetectedObjects([]);
-          }
-        }
-        
-        // Clean up
-        URL.revokeObjectURL(imageUrl);
-      } catch (error) {
-        console.error('Error taking picture:', error);
-        alert('Kunde inte ta foto');
-      } finally {
-        setIsProcessing(false);
-      }
-    }
-  };
-
-  const shareGame = async (object) => {
+    if (!videoRef.current || !canvasRef.current || isProcessing) return;
+    
     try {
-      const success = await SMSService.shareGame(object, currentPlayer, player1.name, player2.name);
-      if (success) {
-        // Set up the game and enter waiting state
-        dispatch({
-          type: 'START_GAME',
-          payload: {
-            targetObject: object,
-            playerName: currentPlayer,
-            timestamp: Date.now(),
-          },
-        });
-        
-        // Enter waiting state for opponent
-        dispatch({ type: 'SHARE_GAME' });
-        
-        // Navigate to waiting screen
-        navigate('/waiting');
+      setIsProcessing(true);
+      
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const blob = await new Promise(resolve => 
+        canvas.toBlob(resolve, 'image/jpeg', 0.9)
+      );
+      const imageUrl = URL.createObjectURL(blob);
+      
+      const detections = await ObjectDetectionService.detectObjects(imageUrl);
+      
+      if (Array.isArray(detections) && detections.length > 0) {
+        setDetectedObjects(detections);
+        setShowObjectSelector(true);
+      } else if (detections && !Array.isArray(detections)) {
+        // Ett objekt detekterat
+        handleObjectSelect(detections);
+      } else {
+        alert('Inga objekt hittades. Försök igen!');
       }
+      
+      URL.revokeObjectURL(imageUrl);
     } catch (error) {
-      console.error('Error sharing game:', error);
-      alert('Kunde inte dela spelet');
+      console.error('Error taking picture:', error);
+      alert('Något gick fel. Försök igen!');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleObjectSelect = async (selectedObject) => {
-    setDetectedObject(selectedObject);
     setShowObjectSelector(false);
+    setDetectedObjects([]);
     
-    const confirmed = window.confirm(
-      `Du valde: ${selectedObject.objectClass} (${Math.round(selectedObject.confidence * 100)}% säker). Vill du dela spelet?`
+    // Sätt objektet som mål
+    dispatch({ type: 'SET_TARGET_OBJECT', payload: selectedObject });
+    
+    // Dela utmaningen
+    const shared = await SMSService.shareChallenge(
+      selectedObject,
+      currentPlayerName,
+      player1.score,
+      player2.score
     );
     
-    if (confirmed) {
-      await shareGame(selectedObject);
-    } else {
-      setDetectedObject(null);
-      setDetectedObjects([]);
+    if (shared) {
+      stopCamera();
+      navigate('/');
     }
   };
 
-  const handleCancelSelection = () => {
-    setShowObjectSelector(false);
-    setDetectedObjects([]);
-    setDetectedObject(null);
+  const handleCancel = () => {
+    stopCamera();
+    navigate('/');
   };
 
   if (isModelLoading) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Laddar AI-modell...</p>
-        <p style={{ fontSize: '14px', opacity: 0.7 }}>Detta kan ta några sekunder första gången</p>
-      </div>
-    );
-  }
-
-  if (isProcessing) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Analyserar foto med AI...</p>
+        <p>Förbereder kamera...</p>
       </div>
     );
   }
 
   return (
     <div className="camera-screen">
-      <div className="camera-container">
+      <div className="camera-header">
+        <button className="back-btn" onClick={handleCancel}>
+          ← Tillbaka
+        </button>
+        <div className="camera-score">
+          {player1.name}: {player1.score} - {player2.name || '?'}: {player2.score}
+        </div>
+      </div>
+
+      <div className="camera-viewport">
         <video
           ref={videoRef}
-          className="camera-video"
+          className="camera-feed"
           autoPlay
           playsInline
           muted
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
         
-        <div className="camera-overlay">
-          <div className="camera-top">
-            <p>Rikta kameran mot ett objekt</p>
-          </div>
-          
-          <div className="camera-bottom">
-            <button
-              className="capture-button"
-              onClick={takePicture}
-              disabled={isProcessing}
-            >
-              <div className="capture-button-inner"></div>
-            </button>
-          </div>
+        <div className="camera-instruction">
+          Fotografera ett objekt
         </div>
       </div>
 
+      <div className="camera-controls">
+        <button
+          className={`capture-btn ${isProcessing ? 'processing' : ''}`}
+          onClick={takePicture}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <div className="mini-spinner"></div>
+          ) : (
+            <div className="capture-icon"></div>
+          )}
+        </button>
+      </div>
+
       {showObjectSelector && (
-        <div className="object-selector-overlay">
-          <div className="object-selector">
+        <div className="modal-overlay">
+          <div className="object-selector-modal">
             <h3>Välj objekt att skicka:</h3>
-            <div className="object-list">
+            <div className="objects-grid">
               {detectedObjects.map((obj, index) => (
-                <div 
-                  key={index} 
-                  className="object-option"
+                <button
+                  key={index}
+                  className="object-card"
                   onClick={() => handleObjectSelect(obj)}
                 >
-                  <div className="object-info">
-                    <span className="object-name">{obj.objectClass}</span>
-                    <span className="object-confidence">
-                      {Math.round(obj.confidence * 100)}% säker
-                    </span>
+                  <div className="object-name">{obj.objectClass}</div>
+                  <div className="object-confidence">
+                    {Math.round(obj.confidence * 100)}%
                   </div>
-                  <div className="object-arrow">→</div>
-                </div>
+                </button>
               ))}
             </div>
-            <div className="object-selector-actions">
-              <button 
-                className="btn btn-secondary" 
-                onClick={handleCancelSelection}
-              >
-                Avbryt
-              </button>
-            </div>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowObjectSelector(false);
+                setDetectedObjects([]);
+              }}
+            >
+              Ta om foto
+            </button>
           </div>
-        </div>
-      )}
-
-      {detectedObject && !showObjectSelector && (
-        <div className="game-info">
-          <p><strong>Objekt:</strong> {detectedObject.objectClass}</p>
-          <p><strong>Säkerhet:</strong> {Math.round(detectedObject.confidence * 100)}%</p>
         </div>
       )}
     </div>
